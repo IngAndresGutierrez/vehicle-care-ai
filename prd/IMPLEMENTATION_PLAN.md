@@ -46,7 +46,7 @@ Sin bloqueo inmediato (pueden resolverse en paralelo): D-12/D-13 (jurídico), D-
 - Repositorio con bloqueo optimista y `JourneyEvent` append-only.
 - **Hecho cuando:** FSM-01…FSM-12 en verde; transición inválida devuelve `INVALID_TRANSITION`.
 
-### Fase 4 — Puertos, mocks e integración taller/CRM (≈2 h) · AC09, AC14
+### Fase 4 — Puertos, mocks e integración taller/CRM (≈2 h) · AC09, AC14 · ✅ implementada 28-oct-2026 (pendiente de revisión)
 
 - `integrations/ports/*`, adaptadores mock sobre tablas `Mock*`, `FaultInjector`, capa anticorrupción.
 - Casos de uso: `request-quote`, `list-slots`, `prepare-booking`, `confirm-booking` (idempotente), `open-human-case`, `record-odometer`, `complete-work-order`.

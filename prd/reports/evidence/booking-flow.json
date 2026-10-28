@@ -1,0 +1,198 @@
+{
+  "generatedWith": "pnpm demo:booking-flow",
+  "note": "Datos y sistemas SIMULADOS (MOCK/SYNTHETIC-DEMO). Token redactado.",
+  "clock": "2026-10-28T17:00:00.000Z",
+  "evidence": [
+    {
+      "step": "0. Evaluación (job)",
+      "result": {
+        "vehicleId": "veh-demo-v1",
+        "serviceCode": "ENGINE_OIL_FILTER",
+        "evaluation": {
+          "evaluationId": "cmvslr7ik00002cy5bc0a0vnk",
+          "status": "UPCOMING"
+        },
+        "journey": {
+          "state": "NEED_DETECTED",
+          "evaluatedEvent": "APPLIED"
+        },
+        "reminder": {
+          "outcome": "SIMULATED_SENT",
+          "outboundMessageId": "cmvslr7je00042cy54sf3enc5",
+          "channel": "WHATSAPP",
+          "consentEventId": "cons-cust-demo-c1-rem-wa-ev1",
+          "dedupKey": "reminder:v1:veh-demo-v1:ENGINE_OIL_FILTER:rule-demo-oil:svc-demo-1:demo-comm-v1:2026-10-22:SENT",
+          "deduplicated": false,
+          "pendingNotification": {
+            "outboundMessageId": "cmvslr7je00042cy54sf3enc5",
+            "channel": "WHATSAPP",
+            "templateId": "maintenance-reminder-v1",
+            "consentEventId": "cons-cust-demo-c1-rem-wa-ev1",
+            "dedupKey": "reminder:v1:veh-demo-v1:ENGINE_OIL_FILTER:rule-demo-oil:svc-demo-1:demo-comm-v1:2026-10-22:SENT"
+          }
+        }
+      }
+    },
+    {
+      "step": "1. Recomendación presentada",
+      "result": {
+        "journeyState": "RECOMMENDATION_PRESENTED",
+        "evaluationId": "cmvslr7ik00002cy5bc0a0vnk"
+      }
+    },
+    {
+      "step": "2. Talleres",
+      "result": [
+        {
+          "workshopId": "ws-demo-t1",
+          "name": "Taller Norte (demo)",
+          "city": "Ciudad Demo"
+        },
+        {
+          "workshopId": "ws-demo-t2",
+          "name": "Taller Sur (demo)",
+          "city": "Ciudad Demo"
+        }
+      ]
+    },
+    {
+      "step": "3. Cotización (MOCK)",
+      "result": {
+        "quoteId": "cmvslr7mj00172cy59woxxzag",
+        "workshopId": "ws-demo-t1",
+        "serviceCode": "ENGINE_OIL_FILTER",
+        "isEstimate": false,
+        "subtotalCop": 280000,
+        "taxCop": 53200,
+        "totalCop": 333200,
+        "taxLabel": "IVA 19% (valor sintético del catálogo MOCK)",
+        "includedItems": [
+          {
+            "qty": 1,
+            "description": "Aceite de motor (referencia ficticia)"
+          },
+          {
+            "qty": 1,
+            "description": "Filtro de aceite (referencia ficticia)"
+          },
+          {
+            "qty": 1,
+            "description": "Mano de obra"
+          }
+        ],
+        "restrictions": [
+          "Precio sintético de demostración: no es una tarifa real.",
+          "Sujeto a inspección del vehículo en el taller."
+        ],
+        "validUntil": "2026-10-30T17:00:00.000Z",
+        "catalogVersion": "SYNTHETIC-DEMO:catalogo-mock-v1",
+        "source": "MOCK",
+        "journeyState": "QUOTE_PRESENTED",
+        "duplicate": false
+      }
+    },
+    {
+      "step": "4. Horarios (MOCK)",
+      "result": {
+        "slots": [
+          {
+            "slotRef": "slot-t1-1",
+            "startsAt": "2026-10-29T13:00:00.000Z",
+            "endsAt": "2026-10-29T15:00:00.000Z"
+          },
+          {
+            "slotRef": "slot-t1-2",
+            "startsAt": "2026-10-30T13:00:00.000Z",
+            "endsAt": "2026-10-30T15:00:00.000Z"
+          },
+          {
+            "slotRef": "slot-t1-3",
+            "startsAt": "2026-10-31T15:00:00.000Z",
+            "endsAt": "2026-10-31T17:00:00.000Z"
+          },
+          {
+            "slotRef": "slot-t1-4",
+            "startsAt": "2026-11-02T19:00:00.000Z",
+            "endsAt": "2026-11-02T21:00:00.000Z"
+          }
+        ],
+        "source": "MOCK",
+        "journeyState": "SLOT_SELECTION"
+      }
+    },
+    {
+      "step": "5. Intención de reserva (requiere clic del propietario)",
+      "result": {
+        "intentId": "cmvslr7mz001d2cy5f8nxugq6",
+        "confirmationToken": "[REDACTADO: 43 caracteres]",
+        "expiresAt": "2026-10-28T17:10:00.000Z",
+        "requiresUserConfirmation": true,
+        "summary": {
+          "serviceCode": "ENGINE_OIL_FILTER",
+          "workshopId": "ws-demo-t1",
+          "workshopName": "Taller Norte (demo)",
+          "slotRef": "slot-t1-1",
+          "startsAt": "2026-10-29T13:00:00.000Z",
+          "totalCop": 333200,
+          "taxCop": 53200,
+          "source": "MOCK"
+        },
+        "reissued": false
+      }
+    },
+    {
+      "step": "5b. El agente intenta confirmar",
+      "result": {
+        "ok": false,
+        "error": {
+          "code": "AGENT_CANNOT_CONFIRM"
+        }
+      }
+    },
+    {
+      "step": "6. Confirmación por el propietario (folio del taller MOCK)",
+      "result": {
+        "status": "CONFIRMED",
+        "bookingId": "cmvslr7n7001h2cy5t55lb2ve",
+        "folio": "FOLIO-T1-DEMO-224058BD",
+        "startsAt": "2026-10-29T13:00:00.000Z",
+        "workshopId": "ws-demo-t1",
+        "totalCop": 333200,
+        "source": "MOCK",
+        "duplicate": false
+      }
+    },
+    {
+      "step": "7. Reserva y journey",
+      "result": {
+        "booking": {
+          "status": "CONFIRMED",
+          "externalBookingRef": "FOLIO-T1-DEMO-224058BD",
+          "source": "MOCK",
+          "confirmedByRole": "OWNER",
+          "startsAt": "2026-10-29T13:00:00.000Z"
+        },
+        "mockWorkshopBooking": {
+          "folio": "FOLIO-T1-DEMO-224058BD",
+          "status": "CONFIRMED",
+          "slotId": "slot-t1-1"
+        },
+        "journeyState": "BOOKED",
+        "journeyEvents": [
+          "1. EVALUATED ACTIVATED→NEED_DETECTED (SYSTEM_JOB)",
+          "2. CONTACT_SENT NEED_DETECTED→NEED_DETECTED (SYSTEM_JOB)",
+          "3. OWNER_OPENED NEED_DETECTED→CONVERSATION_OPEN (OWNER)",
+          "4. RECOMMENDATION_SHOWN CONVERSATION_OPEN→RECOMMENDATION_PRESENTED (SYSTEM_AGENT)",
+          "5. QUOTE_ISSUED RECOMMENDATION_PRESENTED→QUOTE_PRESENTED (SYSTEM_AGENT)",
+          "6. SLOTS_LISTED QUOTE_PRESENTED→SLOT_SELECTION (SYSTEM_AGENT)",
+          "7. BOOKING_INTENT_CREATED SLOT_SELECTION→AWAITING_CONFIRMATION (SYSTEM_AGENT)",
+          "8. BOOKING_CONFIRMED AWAITING_CONFIRMATION→BOOKED (OWNER)"
+        ],
+        "consistency": {
+          "ok": true,
+          "value": "BOOKED"
+        }
+      }
+    }
+  ]
+}

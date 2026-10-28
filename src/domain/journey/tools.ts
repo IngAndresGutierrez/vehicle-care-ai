@@ -37,7 +37,7 @@ const TOOLS_BY_STATE: Readonly<Record<JourneyState, readonly AgentToolName[]>> =
   RECOMMENDATION_PRESENTED: [...CONVERSATION, "listWorkshops", "getQuote"],
   QUOTE_PRESENTED: [...CONVERSATION, "listWorkshops", "getQuote", "getAvailableSlots"],
   QUOTE_PENDING_HUMAN: [...READ, ...HANDOFF],
-  SLOT_SELECTION: [...READ, "listWorkshops", "getAvailableSlots", "prepareBooking", ...HANDOFF],
+  SLOT_SELECTION: [...READ, "listWorkshops", "getQuote", "getAvailableSlots", "prepareBooking", ...HANDOFF],
   // Ninguna mutación comercial mientras se espera el clic del propietario.
   AWAITING_CONFIRMATION: [...READ, ...HANDOFF],
   BOOKED: [...READ, ...HANDOFF],

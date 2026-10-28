@@ -44,7 +44,7 @@ async function driveToAwaitingConfirmation(): Promise<{ intentId: string }> {
   await apply({ type: "QUOTE_ISSUED", quoteId: quote.id }, AGENT_FOR_C1, "quote");
   await apply({ type: "SLOTS_LISTED", workshopId: W.t1 }, AGENT_FOR_C1, "slots");
   const intent = await db.bookingIntent.create({
-    data: { confirmationToken: "tok-1", vehicleId: V.v1, quoteId: quote.id, slotExternalRef: "slot-t1-2", slotStartsAt: new Date("2026-10-30T13:00:00Z"), workshopId: W.t1, requestedById: A.ownerC1, expiresAt: new Date("2026-10-28T18:00:00Z"), traceId: "trc" },
+    data: { confirmationTokenHash: "a".repeat(64), customerId: C.c1, serviceCode: OIL, vehicleId: V.v1, quoteId: quote.id, slotExternalRef: "slot-t1-2", slotStartsAt: new Date("2026-10-30T13:00:00Z"), workshopId: W.t1, requestedById: A.ownerC1, expiresAt: new Date("2026-10-28T18:00:00Z"), traceId: "trc" },
   });
   await apply({ type: "BOOKING_INTENT_CREATED", intentId: intent.id }, AGENT_FOR_C1, "intent");
   return { intentId: intent.id };

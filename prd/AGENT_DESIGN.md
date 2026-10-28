@@ -250,6 +250,8 @@ Las herramientas disponibles dependen además del estado del journey: `allowedTo
 
 **Regla dura:** ninguna respuesta puede afirmar éxito de una mutación sin `ok:true` en ese turno (verificado por output guard).
 
+> **Implementado en Fase 4** (ADR-017): `prepareBooking`/`confirmBooking`/`reconcileBooking` en `src/application/booking/`. Diferencias con este borrador: el token se guarda solo como sha256; la clave de idempotencia del taller es `vc-booking:{intentId}`; existen los resultados `PENDING_RECONCILIATION` y los errores `INVALID_TOKEN`, `INTENT_EXPIRED`, `INTENT_INVALIDATED`, `AGENT_CANNOT_CONFIRM`, `QUOTE_MISMATCH` y `SAFETY_ESCALATED`.
+
 ### 4.3 Confirmación explícita de reserva
 
 1. `prepareBooking` crea `BookingIntent{confirmationToken, expiresAt = now + 10 min}` **[D-23]**.

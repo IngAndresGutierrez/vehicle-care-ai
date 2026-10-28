@@ -224,6 +224,12 @@ describe("FSM — reservas y guardias", () => {
     expect(to(s, SAMPLE_EVENTS.QUOTE_ISSUED, ADVISOR)).toMatchObject({ to: "QUOTE_PRESENTED", context: { openCaseId: null, activeQuoteId: "q" } });
   });
 
+  it("recotización desde SLOT_SELECTION cuando la cotización caduca (ADR-017)", () => {
+    const out = to(snap("SLOT_SELECTION", { activeQuoteId: "q-old" }), { type: "QUOTE_ISSUED", quoteId: "q-new" }, AGENT);
+    expect(out).toMatchObject({ to: "QUOTE_PRESENTED", context: { activeQuoteId: "q-new" } });
+    expect(isToolAllowed("SLOT_SELECTION", "getQuote")).toBe(true);
+  });
+
   it("recorrido feliz completo hasta MONITORING", () => {
     let s = snap("ACTIVATED");
     const steps: Array<[JourneyEvent, JourneyActor, JourneyState]> = [

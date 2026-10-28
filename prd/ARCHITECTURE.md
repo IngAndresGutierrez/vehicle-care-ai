@@ -246,7 +246,7 @@ Regla sintética 5.000 km / 12 meses, último servicio 70.000 km el 2026-04-01, 
 
 ## 6. Máquina de estados del journey (UC-01)
 
-**Implementado en Fase 3** (ADR-015): tabla declarativa pura en `src/domain/journey/machine.ts` (sin librería; resuelve D-07), `allowedTools(state)` en `tools.ts`, reproducción y verificación en `replay.ts`. Los eventos se aplican con `src/application/journey/journey-store.ts`. Persistencia: `JourneyInstance.state` + `version` (bloqueo optimista) y `JourneyEvent` append-only. El estado se reconstruye o valida desde eventos en tests.
+**Implementado en Fase 3** (ADR-015; Fase 4 añade la recotización desde `SLOT_SELECTION`, ADR-017): tabla declarativa pura en `src/domain/journey/machine.ts` (sin librería; resuelve D-07), `allowedTools(state)` en `tools.ts`, reproducción y verificación en `replay.ts`. Los eventos se aplican con `src/application/journey/journey-store.ts`. Persistencia: `JourneyInstance.state` + `version` (bloqueo optimista) y `JourneyEvent` append-only. El estado se reconstruye o valida desde eventos en tests.
 
 ### 6.1 Estados
 
@@ -309,6 +309,8 @@ Invariantes (tests de FSM):
 ---
 
 ## 7. Arquitectura de integración (CRM, taller, reservas)
+
+> **Implementado en Fase 4** (ADR-017): `src/integrations/ports/{workshop,crm,notifications}.ts`; MOCK en `src/integrations/mock/` (sistema de taller simulado + adaptador anticorrupción, CRM y escenarios de fallo). Los contratos finales difieren del borrador de abajo: `getSlot`, `findBooking`, `cancelBooking`, `openWorkOrder`, `completeWorkOrder` y el código `OUTCOME_UNCERTAIN`.
 
 ### 7.1 Puertos
 
@@ -419,6 +421,7 @@ El catálogo de casos está en `IMPLEMENTATION_PLAN.md §4`.
 | [ADR-014](./adr/ADR-014-persistencia-fase-2.md) | Persistencia de Fase 2: ajustes de esquema, invariantes SQL null-safe, append-only ampliado, verificación de migraciones en base desechable | Reset con Prisma | Integridad garantizada por la BD y migraciones reproducibles sin operaciones destructivas |
 | [ADR-015](./adr/ADR-015-journey-fsm-idempotencia-contacto.md) | FSM declarativa pura; eventos idempotentes con bloqueo optimista; deduplicación de recordatorios por ciclo/política/ventana; outbox simplificado | XState; dedup por `inputHash` | Determinismo, auditoría y ausencia de duplicados ante reintentos y concurrencia |
 | [ADR-016](./adr/ADR-016-minimo-privilegio-personal.md) | Asesor por cartera o caso asignado; compliance solo auditoría justificada o caso asignado; resolución solo por asignación | Acceso amplio por rol | Mínimo privilegio y Ley 1581 |
+| [ADR-017](./adr/ADR-017-reservas-mock-y-seguridad.md) | Reservas con taller/CRM MOCK detrás de puertos y capa anticorrupción; token hasheado; confirmación humana en tres fases con reconciliación de resultados inciertos y compensación | Llamar al taller dentro de la transacción; confirmar ante timeout | AC06/AC09: nunca una reserva confirmada sin folio, sin duplicados y sin reintentos a ciegas |
 
 ---
 
@@ -456,6 +459,9 @@ El catálogo de casos está en `IMPLEMENTATION_PLAN.md §4`.
 | D-32 | SLA de casos de seguridad | — | **Provisional:** 30 minutos (`SAFETY_SLA_MINUTES`) | Operación de la agencia |
 | D-33 | Reapertura de un journey `CLOSED` (journey único por vehículo+servicio) | Nuevo journey por ciclo / reapertura humana | Pendiente (P1) | Producto |
 | D-34 | Alcance por agencia/sede y rol supervisor | — | Pendiente (ADR-016) | Cliente |
+| D-36 | Intentos de reconciliación antes de escalar | — | **Provisional (ADR-017):** 3 intentos → caso `BOOKING_FAILURE` HIGH | Operación |
+| D-37 | Gracia antes de dar por fallida una reserva «no encontrada» en un taller real | Ventana / webhook | Pendiente para integración real (el MOCK es síncrono) | Arquitectura + proveedor |
+| D-38 | Tarifas reales y vigencia de cotización | — | Pendiente: el catálogo MOCK es sintético (48 h de vigencia) | Cliente (PRD §14.8) |
 
 ### 12.2 Supuestos
 

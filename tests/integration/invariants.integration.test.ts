@@ -244,10 +244,12 @@ describe("ADR-013/014 — planes, reglas y estados", () => {
     });
     const intent = (n: number) =>
       db.bookingIntent.create({
-        data: { confirmationToken: `tok-${n}`, vehicleId: V.v1, quoteId: quote.id, slotExternalRef: "slot-t1-2", slotStartsAt: new Date("2026-10-30T13:00:00Z"), workshopId: DEMO_IDS.workshops.t1, requestedById: A.ownerC1, expiresAt: new Date("2026-10-28T18:00:00Z"), traceId: "trc" },
+        data: { confirmationTokenHash: String(n).repeat(64).slice(0, 64), customerId: C.c1, serviceCode: "ENGINE_OIL_FILTER", vehicleId: V.v1, quoteId: quote.id, slotExternalRef: "slot-t1-2", slotStartsAt: new Date("2026-10-30T13:00:00Z"), workshopId: DEMO_IDS.workshops.t1, requestedById: A.ownerC1, expiresAt: new Date("2026-10-28T18:00:00Z"), traceId: "trc" },
       });
     const booking = (intentId: string, n: number, folio: string | null) => ({
       vehicleId: V.v1, quoteId: quote.id, serviceCode: "ENGINE_OIL_FILTER", intentId, workshopId: DEMO_IDS.workshops.t1, slotExternalRef: "slot-t1-2", startsAt: new Date("2026-10-30T13:00:00Z"), status: "CONFIRMED" as const, externalBookingRef: folio, idempotencyKey: `idem-${n}`, source: "MOCK" as const, traceId: "trc",
+      // Desde la Fase 4 toda reserva enviada al taller registra al humano que la aprobó (Booking_confirmed_by_human).
+      confirmedById: A.ownerC1, confirmedByRole: "OWNER" as const,
     });
     const i1 = await intent(1);
     await expectDbRejection(db.booking.create({ data: booking(i1.id, 1, null) }), /Booking_confirmed_has_folio/);

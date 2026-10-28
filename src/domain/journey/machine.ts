@@ -186,7 +186,8 @@ export const RULES: readonly AnyRule[] = [
   rule({
     id: "quote-issued",
     event: "QUOTE_ISSUED",
-    from: ["RECOMMENDATION_PRESENTED", "QUOTE_PRESENTED", "QUOTE_PENDING_HUMAN"],
+    // SLOT_SELECTION: recotización cuando la cotización vigente caduca antes de preparar la reserva (ADR-017).
+    from: ["RECOMMENDATION_PRESENTED", "QUOTE_PRESENTED", "QUOTE_PENDING_HUMAN", "SLOT_SELECTION"],
     to: "QUOTE_PRESENTED",
     guard: (_e, ctx, actor) => (ctx.openCaseReason === "QUOTE_UNAVAILABLE" && actor.role !== "ADVISOR" ? "HUMAN_QUOTE_REQUIRED" : null),
     update: (e, ctx) => ({

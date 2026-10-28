@@ -58,7 +58,56 @@ export async function seedDemoData(db: Db): Promise<SeedSummary> {
   const existing = await db.communicationPolicy.findUnique({ where: { id: DEMO_IDS.communicationPolicy } });
   if (!existing) await seedBase(db);
   await seedPortfolioAssignments(db);
+  await seedMockCatalog(db);
   return { seeded: !existing };
+}
+
+/** Versión del catálogo simulado; el prefijo la rotula como sintética en toda cotización que la cite. */
+export const MOCK_CATALOG_VERSION = "SYNTHETIC-DEMO:catalogo-mock-v1";
+
+/**
+ * Fase 4 (ADR-017): catálogo de precios del taller SIMULADO. Valores ficticios para la demo, no tarifas reales.
+ * La clave de especificación debe coincidir con `specKeyOf` (make|model|year|engine). V4 (motor no identificado)
+ * no tiene precio a propósito. Sin precio de correa: una cotización de correa termina en caso humano.
+ */
+async function seedMockCatalog(db: Db): Promise<void> {
+  const items = [
+    { descripcion: "Aceite de motor (referencia ficticia)", cantidad: 1 },
+    { descripcion: "Filtro de aceite (referencia ficticia)", cantidad: 1 },
+    { descripcion: "Mano de obra", cantidad: 1 },
+  ];
+  const restrictions = ["Precio sintético de demostración: no es una tarifa real.", "Sujeto a inspección del vehículo en el taller."];
+  const specKeys = {
+    sedan: "DemoMotors|Sedán Demo|2021|DEMO-1.6",
+    suv: "DemoMotors|SUV Demo|2019|DEMO-2.0",
+    hatch: "DemoMotors|Hatchback Demo|2020|DEMO-1.4",
+  };
+  // [taller, especificación, subtotal COP, impuesto COP]
+  const rows: Array<[string, string, number, number]> = [
+    ["T1-DEMO", specKeys.sedan, 280_000, 53_200],
+    ["T1-DEMO", specKeys.suv, 340_000, 64_600],
+    ["T1-DEMO", specKeys.hatch, 250_000, 47_500],
+    ["T2-DEMO", specKeys.sedan, 295_000, 56_050],
+    ["T2-DEMO", specKeys.suv, 355_000, 67_450],
+    ["T2-DEMO", specKeys.hatch, 262_000, 49_780],
+  ];
+  await db.mockCatalogPrice.createMany({
+    data: rows.map(([workshopExternalRef, specKey, subtotalCop, taxCop]) => ({
+      id: `price-${workshopExternalRef}-${specKey}`.replace(/[^A-Za-z0-9-]/g, "_"),
+      workshopExternalRef,
+      externalServiceCode: "EXT-OIL-01",
+      specKey,
+      subtotalCop,
+      taxCop,
+      taxLabel: "IVA 19% (valor sintético del catálogo MOCK)",
+      includedItems: items,
+      restrictions,
+      catalogVersion: MOCK_CATALOG_VERSION,
+      validityHours: 48,
+      isEstimate: false,
+    })),
+    skipDuplicates: true,
+  });
 }
 
 /**

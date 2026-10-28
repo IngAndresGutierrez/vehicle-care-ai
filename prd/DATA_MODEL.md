@@ -39,7 +39,7 @@ Mock*: MockCatalogPrice · MockSlot · MockBooking · MockWorkOrder · MockScena
 
 ## 3. `prisma/schema.prisma` (propuesto)
 
-> **Implementado en Fases 2–3.** Copia de `prisma/schema.prisma` (fuente de verdad) al 2026-10-28. Fase 3 añade `JourneyInstance.context`, `JourneyEvent.idempotencyKey`, deduplicación en `OutboundMessage`, frecuencia en `CommunicationPolicy`, `PortfolioAssignment` y `HumanCase.journeyId` (ADR-015/016). Prisma 7.10.1: generador `prisma-client` con `output`; URL en `prisma.config.ts`. Cambios respecto al borrador previo en ADR-014.
+> **Implementado en Fases 2–3.** Copia de `prisma/schema.prisma` (fuente de verdad) al 2026-10-28. Fase 3 añade `JourneyInstance.context`, `JourneyEvent.idempotencyKey`, deduplicación en `OutboundMessage`, frecuencia en `CommunicationPolicy`, `PortfolioAssignment` y `HumanCase.journeyId` (ADR-015/016). Fase 4 añade `BookingIntent.confirmationTokenHash`/`customerId`/`serviceCode`, confirmación humana y reconciliación en `Booking`, `MockQuote`, `MockCrmInteraction` y estados en `MockBooking`/`MockWorkOrder` (ADR-017). Prisma 7.10.1: generador `prisma-client` con `output`; URL en `prisma.config.ts`. Cambios respecto al borrador previo en ADR-014.
 
 ```prisma
 // Vehicle Care — modelo de datos (prd/DATA_MODEL.md §3, ADR-009…ADR-014).
@@ -579,42 +579,53 @@ model Quote {
 }
 
 model BookingIntent {
-  id                String              @id @default(cuid())
-  confirmationToken String              @unique // emitido por servidor; consumido por clic UI
-  vehicleId         String
-  quoteId           String
-  quote             Quote               @relation(fields: [quoteId], references: [id])
-  slotExternalRef   String
-  slotStartsAt      DateTime
-  workshopId        String
-  requestedById     String // actor OWNER
-  status            BookingIntentStatus @default(AWAITING_USER)
-  expiresAt         DateTime
-  traceId           String
-  createdAt         DateTime            @default(now())
-  booking           Booking?
+  id                    String              @id @default(cuid())
+  /// sha256 del token de confirmación; el token en claro solo se entrega una vez al solicitante (ADR-017)
+  confirmationTokenHash String              @unique
+  vehicleId             String
+  customerId            String? // titular para quien se prepara la reserva (obligatorio en filas nuevas)
+  serviceCode           String? // servicio reservado (obligatorio en filas nuevas)
+  quoteId               String
+  quote                 Quote               @relation(fields: [quoteId], references: [id])
+  slotExternalRef       String
+  slotStartsAt          DateTime
+  workshopId            String
+  requestedById         String // actor que preparó la intención (agente por cuenta del titular o asesor)
+  status                BookingIntentStatus @default(AWAITING_USER)
+  consumedAt            DateTime?
+  expiresAt             DateTime
+  traceId               String
+  createdAt             DateTime            @default(now())
+  booking               Booking?
 }
 
 model Booking {
-  id                 String        @id @default(cuid())
-  vehicleId          String
-  vehicle            Vehicle       @relation(fields: [vehicleId], references: [id])
-  quoteId            String
-  quote              Quote         @relation(fields: [quoteId], references: [id])
-  serviceCode        String // desnormalizado de Quote: índice parcial "una reserva activa" (ADR-014)
-  intentId           String        @unique
-  intent             BookingIntent @relation(fields: [intentId], references: [id])
-  workshopId         String
-  slotExternalRef    String
-  startsAt           DateTime
-  status             BookingStatus
-  externalBookingRef String?       @unique // folio; null ⇒ nunca mostrar «confirmada»
-  failureCode        String? // SLOT_CONFLICT, QUOTE_EXPIRED, ...
-  idempotencyKey     String        @unique
-  source             DataSource
-  traceId            String
-  createdAt          DateTime      @default(now())
-  workOrder          WorkOrder?
+  id                     String        @id @default(cuid())
+  vehicleId              String
+  vehicle                Vehicle       @relation(fields: [vehicleId], references: [id])
+  quoteId                String
+  quote                  Quote         @relation(fields: [quoteId], references: [id])
+  serviceCode            String // desnormalizado de Quote: índice parcial "una reserva activa" (ADR-014)
+  intentId               String        @unique
+  intent                 BookingIntent @relation(fields: [intentId], references: [id])
+  workshopId             String
+  slotExternalRef        String
+  startsAt               DateTime
+  status                 BookingStatus
+  externalBookingRef     String?       @unique // folio; null ⇒ nunca mostrar «confirmada»
+  failureCode            String? // SLOT_CONFLICT, QUOTE_EXPIRED, ...
+  idempotencyKey         String        @unique
+  source                 DataSource
+  traceId                String
+  createdAt              DateTime      @default(now())
+  workOrder              WorkOrder?
+  /// Humano que aprobó la reserva (propietario o asesor autorizado); el agente nunca confirma.
+  confirmedById          String?
+  confirmedByRole        ActorRole?
+  /// Reconciliación de resultados inciertos del taller (ADR-017).
+  reconciliationAttempts Int           @default(0)
+  lastReconciledAt       DateTime?
+  escalatedCaseId        String?
 }
 
 model WorkOrder {
@@ -829,20 +840,54 @@ model MockSlot {
 }
 
 model MockBooking {
-  id               String   @id @default(cuid())
-  folio            String   @unique // p.ej. "VC-2026-000123"
-  slotId           String
-  externalQuoteRef String
-  idempotencyKey   String   @unique
-  requestHash      String
-  createdAt        DateTime @default(now())
+  id                  String    @id @default(cuid())
+  folio               String    @unique // p.ej. "VC-2026-000123"
+  slotId              String
+  externalQuoteRef    String
+  idempotencyKey      String    @unique
+  requestHash         String
+  createdAt           DateTime  @default(now())
+  status              String    @default("CONFIRMED") // CONFIRMED | CANCELLED (estado en el sistema del taller simulado)
+  workshopExternalRef String?
+  vehicleRef          String?
+  customerRef         String?
+  cancelledAt         DateTime?
+}
+
+/// Cotizaciones emitidas por el taller simulado: el taller valida su vigencia al reservar.
+model MockQuote {
+  id                  String   @id @default(cuid())
+  externalRef         String   @unique
+  workshopExternalRef String
+  externalServiceCode String
+  specKey             String
+  subtotalCop         Int
+  taxCop              Int
+  totalCop            Int
+  catalogVersion      String
+  validUntil          DateTime
+  createdAt           DateTime @default(now())
+}
+
+/// Interacciones registradas en el CRM simulado (idempotentes).
+model MockCrmInteraction {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  kind           String
+  customerRef    String
+  vehicleRef     String
+  payload        Json
+  createdAt      DateTime @default(now())
 }
 
 model MockWorkOrder {
-  id            String @id @default(cuid())
-  folio         String @unique
-  mockBookingId String @unique
-  status        String
+  id                   String    @id @default(cuid())
+  folio                String    @unique
+  mockBookingId        String    @unique
+  status               String // OPEN | COMPLETED
+  createdAt            DateTime  @default(now())
+  completedAt          DateTime?
+  completionOdometerKm Int?
 }
 
 model MockScenario {
@@ -901,7 +946,11 @@ Prisma no expresa todo; se añaden en una migración SQL manual (`prisma migrate
 | `CommunicationPolicy`: `minDaysBetweenReminders ≥ 1`, `maxRemindersPerCycle ≥ 0` | `CHECK` |
 | `PortfolioAssignment`: rango válido; una asignación activa por asesor y cliente | `CHECK` + índice único parcial (ADR-016) |
 
-**Migraciones:** `prisma/migrations/` — `baseline` → `phase2_data_model` (tablas generadas por Prisma) → `phase2_invariants` → `phase2_rule_timing_scope` → `phase2_append_only_errcode` → `phase2_null_safe_checks` → `phase3_journey_contact_scope` → `phase3_case_journey_link`. Se verifican desde una base vacía con `pnpm db:verify-migrations`.
+| `BookingIntent`: token solo como sha256 (`^[0-9a-f]{64}$`); `customerId`/`serviceCode` obligatorios; `CONSUMED` ⇒ `consumedAt` | `CHECK` (+ `NOT VALID` en columnas nuevas) (ADR-017) |
+| `Booking` `PENDING`/`CONFIRMED` ⇒ confirmador humano registrado con rol `OWNER` o `ADVISOR` | `CHECK … NOT VALID` (ADR-017) |
+| `MockQuote.totalCop = subtotal + impuesto`; estados válidos en `MockBooking`/`MockWorkOrder` | `CHECK` |
+
+**Migraciones:** `prisma/migrations/` — `baseline` → `phase2_data_model` (tablas generadas por Prisma) → `phase2_invariants` → `phase2_rule_timing_scope` → `phase2_append_only_errcode` → `phase2_null_safe_checks` → `phase3_journey_contact_scope` → `phase3_case_journey_link` → `phase4_booking_mocks`. Se verifican desde una base vacía con `pnpm db:verify-migrations`.
 
 **Nota de SQL:** un `CHECK` que evalúa a `NULL` se considera satisfecho. Toda condición sobre columnas opcionales usa `IS NULL`/`IS NOT NULL` explícitos (corregido en `phase2_null_safe_checks`).
 

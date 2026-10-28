@@ -23,7 +23,8 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:test:migrate": "PRISMA_TARGET=test prisma migrate deploy",
-    "db:verify-migrations": "tsx scripts/verify-migrations.ts"
+    "db:verify-migrations": "tsx scripts/verify-migrations.ts",
+    "demo:booking-flow": "tsx scripts/demo-booking-flow.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.1",

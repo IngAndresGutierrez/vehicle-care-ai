@@ -44,29 +44,45 @@ describe("ADR-010 — comunicaciones salientes", () => {
     purpose: "MAINTENANCE_REMINDERS" as const,
     templateId: "maintenance-reminder-v1",
     traceId: "trc-inv",
+    cycleKey: "cycle-inv",
     ...SYN("msg"),
   };
+  // Desde la Fase 3 cada mensaje exige una clave de deduplicación única (ADR-015).
+  let seq = 0;
+  const key = () => ({ dedupKey: `dedup-inv-${++seq}` });
 
   it("un mensaje SUPPRESSED no requiere consentEventId pero sí suppressionReason", async () => {
-    await db.outboundMessage.create({ data: { ...base, status: "SUPPRESSED", suppressionReason: "CONSENT_REQUIRED" } });
-    await expectDbRejection(db.outboundMessage.create({ data: { ...base, status: "SUPPRESSED" } }), /OutboundMessage_suppressed_needs_reason/);
+    await db.outboundMessage.create({ data: { ...base, ...key(), status: "SUPPRESSED", suppressionReason: "CONSENT_REQUIRED" } });
+    await expectDbRejection(db.outboundMessage.create({ data: { ...base, ...key(), status: "SUPPRESSED" } }), /OutboundMessage_suppressed_needs_reason/);
   });
 
   it("un envío (simulado) exige la evidencia de consentimiento y que exista", async () => {
-    await expectDbRejection(db.outboundMessage.create({ data: { ...base, status: "SIMULATED_SENT" } }), /OutboundMessage_sent_needs_consent/);
+    await expectDbRejection(db.outboundMessage.create({ data: { ...base, ...key(), status: "SIMULATED_SENT" } }), /OutboundMessage_sent_needs_consent/);
     await expectDbRejection(
-      db.outboundMessage.create({ data: { ...base, status: "SIMULATED_SENT", consentEventId: "no-existe" } }),
+      db.outboundMessage.create({ data: { ...base, ...key(), status: "SIMULATED_SENT", consentEventId: "no-existe" } }),
       /Foreign key|OutboundMessage_consentEventId_fkey/,
     );
-    await db.outboundMessage.create({ data: { ...base, customerId: C.c1, vehicleId: V.v1, status: "SIMULATED_SENT", consentEventId: `cons-${C.c1}-rem-wa-ev1` } });
+    await db.outboundMessage.create({ data: { ...base, ...key(), customerId: C.c1, vehicleId: V.v1, status: "SIMULATED_SENT", consentEventId: `cons-${C.c1}-rem-wa-ev1` } });
+  });
+
+  it("Fase 3: todo mensaje nuevo exige dedupKey y cycleKey, y la clave es única", async () => {
+    await expectDbRejection(
+      db.outboundMessage.create({ data: { ...base, status: "SUPPRESSED", suppressionReason: "CONSENT_REQUIRED" } }),
+      /OutboundMessage_dedup_required/,
+    );
+    await db.outboundMessage.create({ data: { ...base, dedupKey: "fixed", status: "SUPPRESSED", suppressionReason: "CONSENT_REQUIRED" } });
+    await expectDbRejection(
+      db.outboundMessage.create({ data: { ...base, dedupKey: "fixed", status: "SUPPRESSED", suppressionReason: "CONSENT_REQUIRED" } }),
+      /Unique constraint|OutboundMessage_dedupKey_key/,
+    );
   });
 
   it("solo existen los estados SIMULATED_SENT y SUPPRESSED, y el registro es inmutable", async () => {
     await expectDbRejection(
-      db.outboundMessage.create({ data: { ...base, status: "SENT", consentEventId: `cons-${C.c1}-rem-wa-ev1` } }),
+      db.outboundMessage.create({ data: { ...base, ...key(), status: "SENT", consentEventId: `cons-${C.c1}-rem-wa-ev1` } }),
       /OutboundMessage_status_values/,
     );
-    const msg = await db.outboundMessage.create({ data: { ...base, status: "SUPPRESSED", suppressionReason: "CONSENT_REQUIRED" } });
+    const msg = await db.outboundMessage.create({ data: { ...base, ...key(), status: "SUPPRESSED", suppressionReason: "CONSENT_REQUIRED" } });
     await expectDbRejection(
       db.outboundMessage.update({ where: { id: msg.id }, data: { status: "SIMULATED_SENT" } }),
       /append-only: OutboundMessage/,

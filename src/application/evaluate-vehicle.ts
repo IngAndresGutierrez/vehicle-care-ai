@@ -1,3 +1,4 @@
+import { maintenanceCycleKey } from "@/domain/contact/contact-policy";
 import { evaluate, type EvaluationResult } from "@/domain/maintenance-engine";
 import type { ActorContext } from "@/domain/policies/access-policy";
 import { err, ok, type Result } from "@/domain/shared/result";
@@ -23,6 +24,8 @@ export interface EvaluateVehicleCommand {
 export interface EvaluateVehicleOutput {
   evaluationId: string;
   result: EvaluationResult;
+  /** Ciclo de mantenimiento evaluado (regla + servicio de referencia); base de la deduplicación de contactos. */
+  cycleKey: string;
 }
 
 /**
@@ -42,6 +45,13 @@ export async function evaluateVehicle(
   if (!context.ok) return err(context.error);
 
   const result = evaluate(context.value.input, context.value.policies, now);
+  const baselineServiceRecordId = context.value.input.lastService?.recordId ?? null;
+  const cycleKey = maintenanceCycleKey({
+    vehicleId: result.vehicleId,
+    serviceCode: result.serviceCode,
+    ruleId: result.ruleId,
+    baselineServiceRecordId,
+  });
 
   const row = await db.maintenanceEvaluation.create({
     data: {
@@ -63,6 +73,8 @@ export async function evaluateVehicle(
       planVersionLabel: result.plan?.version ?? null,
       planSourceRef: result.plan?.sourceRef ?? null,
       ruleId: result.ruleId,
+      baselineServiceRecordId,
+      cycleKey,
       asOfLocalDate: fromIsoLocalDate(result.asOf.localDate),
       commPolicyVersion: context.value.policies.communication.policyVersion,
       dataQualityPolicyVersion: result.dataQualityPolicyVersion,
@@ -78,7 +90,7 @@ export async function evaluateVehicle(
     select: { id: true },
   });
 
-  return ok({ evaluationId: row.id, result });
+  return ok({ evaluationId: row.id, result, cycleKey });
 }
 
 function fromIsoLocalDate(date: string): Date {

@@ -40,7 +40,7 @@ Sin bloqueo inmediato (pueden resolverse en paralelo): D-12/D-13 (jurídico), D-
 - `access-policy`, `consent-policy` (puras + tests).
 - **Hecho cuando:** integración IT-01…IT-06 en verde; evaluación de V1 reproduce el ejemplo del PRD desde BD.
 
-### Fase 3 — Máquina de estados y eventos (≈1.5 h)
+### Fase 3 — Máquina de estados y eventos (≈1.5 h) · ✅ implementada 28-oct-2026 (pendiente de revisión; incluye P0 de Fase 2: deduplicación de recordatorios, mínimo privilegio, IT-05 completo)
 
 - `domain/journey`: estados, eventos, tabla de transiciones, guardas, herramientas permitidas por estado.
 - Repositorio con bloqueo optimista y `JourneyEvent` append-only.
@@ -178,7 +178,7 @@ Convención: fecha de referencia `now = 2026-10-28T12:00:00-05:00`, `Communicati
 | IT-02 | `getVehicleProfile` de V1 por su titular | Perfil sin placa completa ni PII |
 | IT-03 | Historial V1 | Distingue `provenance` (`WORKSHOP_VERIFIED`, `OWNER_DECLARED`) y `dataOrigin=SYNTHETIC` con `syntheticSourceRef` |
 | IT-04 | Actor C2 lee V1 | `UNAUTHORIZED` |
-| IT-05 | Job de evaluación con C2 (sin `MAINTENANCE_REMINDERS`) | `OutboundMessage.status=SUPPRESSED`, `consentEventId=null`, `suppressionReason=CONSENT_REQUIRED`; transición `CONTACT_SUPPRESSED` del journey → **Fase 3** (requiere la FSM) |
+| IT-05 | Job de evaluación con C2 (sin `MAINTENANCE_REMINDERS`) | `OutboundMessage.status=SUPPRESSED`, `consentEventId=null`, `suppressionReason=CONSENT_REQUIRED`; transición `CONTACT_SUPPRESSED` del journey → **Fase 3** (requiere la FSM) — ✅ completado en Fase 3 |
 | IT-06 | `UPDATE` sobre `JourneyEvent` | Excepción del trigger |
 | IT-07 | `getQuote` V1 en T1 | `Quote ACTIVE` con montos del mock, `source=MOCK` |
 | IT-08 | `getQuote` con escenario `QUOTE_UNAVAILABLE` | `Quote UNAVAILABLE`; sin montos |

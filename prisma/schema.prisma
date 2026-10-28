@@ -204,6 +204,8 @@ model Customer {
   syntheticSourceRef String?
   createdAt          DateTime   @default(now())
 
+  portfolioAssignments PortfolioAssignment[]
+
   ownerships    VehicleOwnership[]
   consents      Consent[]
   actorAccounts ActorAccount[]
@@ -219,6 +221,8 @@ model ActorAccount {
   workshop    Workshop? @relation(fields: [workshopId], references: [id])
   isDemo      Boolean   @default(true)
   createdAt   DateTime  @default(now())
+
+  portfolioAssignments PortfolioAssignment[]
 
   @@index([role])
 }
@@ -344,16 +348,18 @@ model MaintenanceRule {
 
 /// Umbrales comerciales de comunicación (ADR-012). Nunca alteran el vencimiento técnico.
 model CommunicationPolicy {
-  id                 String     @id @default(cuid())
-  version            String     @unique
-  leadKm             Int // [D-02] → UPCOMING
-  leadDays           Int
-  overdueGraceKm     Int // [D-01] → OVERDUE
-  overdueGraceDays   Int
-  dataOrigin         DataOrigin
-  syntheticSourceRef String?
-  isActive           Boolean    @default(false)
-  createdAt          DateTime   @default(now())
+  id                      String     @id @default(cuid())
+  version                 String     @unique
+  leadKm                  Int // [D-02] → UPCOMING
+  leadDays                Int
+  overdueGraceKm          Int // [D-01] → OVERDUE
+  overdueGraceDays        Int
+  minDaysBetweenReminders Int        @default(14) // separación mínima y ancho de ventana de contacto (ADR-015)
+  maxRemindersPerCycle    Int        @default(2) // tope de recordatorios enviados por ciclo
+  dataOrigin              DataOrigin
+  syntheticSourceRef      String?
+  isActive                Boolean    @default(false)
+  createdAt               DateTime   @default(now())
 }
 
 /// Calidad de datos (ADR-012): cuándo una lectura de odómetro deja de ser concluyente.
@@ -432,6 +438,8 @@ model MaintenanceEvaluation {
   planVersionLabel             String? // snapshot de la versión citada
   planSourceRef                String? // snapshot de la fuente citada (SYNTHETIC-DEMO:… si es demo)
   ruleId                       String?
+  baselineServiceRecordId      String? // servicio de referencia del ciclo evaluado
+  cycleKey                     String? // clave estable del ciclo (vehículo, servicio, regla, servicio de referencia)
   asOfLocalDate                DateTime                @db.Date // fecha de negocio America/Bogota
   commPolicyVersion            String
   dataQualityPolicyVersion     String
@@ -443,6 +451,8 @@ model MaintenanceEvaluation {
   decisionTrace                Json
   evaluatedAt                  DateTime
   traceId                      String?
+
+  outboundMessages OutboundMessage[]
 
   @@index([vehicleId, serviceCode, evaluatedAt])
 }
@@ -583,24 +593,27 @@ model WorkOrder {
 // ─────────────────────── Casos humanos ───────────────────────
 
 model HumanCase {
-  id             String          @id @default(cuid())
+  id             String           @id @default(cuid())
   vehicleId      String
-  vehicle        Vehicle         @relation(fields: [vehicleId], references: [id])
+  vehicle        Vehicle          @relation(fields: [vehicleId], references: [id])
+  journeyId      String? // journey (vehículo + servicio) afectado por el caso (ADR-015)
+  journey        JourneyInstance? @relation(fields: [journeyId], references: [id])
   reason         HumanCaseReason
   priority       CasePriority
-  status         CaseStatus      @default(OPEN)
+  status         CaseStatus       @default(OPEN)
   assigneeRole   ActorRole // ADVISOR, COMPLIANCE, ...
   assigneeId     String?
   minimalContext Json // resumen mínimo, sin PII innecesaria
   slaDueAt       DateTime
-  idempotencyKey String          @unique
+  idempotencyKey String           @unique
   openedById     String
   traceId        String
   resolution     String?
   resolvedAt     DateTime?
-  createdAt      DateTime        @default(now())
+  createdAt      DateTime         @default(now())
 
   @@index([status, priority, slaDueAt])
+  @@index([journeyId])
 }
 
 // ─────────────────────── Journey (FSM + eventos) ───────────────────────
@@ -613,25 +626,28 @@ model JourneyInstance {
   serviceCode String
   state       JourneyState
   version     Int            @default(0) // bloqueo optimista
+  context     Json           @default("{}") // JourneyContext de la FSM, se actualiza con el estado (ADR-015)
   updatedAt   DateTime       @updatedAt
   events      JourneyEvent[]
+  humanCases  HumanCase[]
 
   @@unique([vehicleId, useCase, serviceCode])
 }
 
 model JourneyEvent {
-  id         String          @id @default(cuid())
-  journeyId  String
-  journey    JourneyInstance @relation(fields: [journeyId], references: [id])
-  seq        Int // = version tras aplicar
-  type       String // EVALUATED, BOOKING_CONFIRMED, SAFETY_SIGNAL...
-  fromState  JourneyState
-  toState    JourneyState
-  payload    Json
-  actorId    String
-  actorRole  ActorRole
-  traceId    String
-  occurredAt DateTime        @default(now())
+  id             String          @id @default(cuid())
+  journeyId      String
+  journey        JourneyInstance @relation(fields: [journeyId], references: [id])
+  seq            Int // = version tras aplicar
+  type           String // EVALUATED, BOOKING_CONFIRMED, SAFETY_SIGNAL...
+  fromState      JourneyState
+  toState        JourneyState
+  payload        Json
+  actorId        String
+  actorRole      ActorRole
+  traceId        String
+  idempotencyKey String?         @unique // obligatorio en filas nuevas (CHECK NOT VALID); reintentos no duplican eventos
+  occurredAt     DateTime        @default(now())
 
   @@unique([journeyId, seq])
   @@index([traceId])
@@ -715,20 +731,26 @@ model AuditLog {
 }
 
 model OutboundMessage {
-  id                 String         @id @default(cuid())
+  id                 String                 @id @default(cuid())
   customerId         String
   vehicleId          String
   channel            Channel
   purpose            ConsentPurpose
   templateId         String
   consentEventId     String? // opt-in usado; null solo si SUPPRESSED (ADR-010)
-  consentEvent       ConsentEvent?  @relation(fields: [consentEventId], references: [id])
+  consentEvent       ConsentEvent?          @relation(fields: [consentEventId], references: [id])
   status             String // SIMULATED_SENT | SUPPRESSED
   suppressionReason  String? // p.ej. CONSENT_REQUIRED; obligatorio si SUPPRESSED
   dataOrigin         DataOrigin
   syntheticSourceRef String?
+  dedupKey           String?                @unique // ciclo + política + ventana (ADR-015); obligatorio en filas nuevas
+  cycleKey           String?
+  evaluationId       String?
+  evaluation         MaintenanceEvaluation? @relation(fields: [evaluationId], references: [id])
   traceId            String
-  createdAt          DateTime       @default(now())
+  createdAt          DateTime               @default(now())
+
+  @@index([cycleKey, status])
 }
 
 // ─────────────────────── Estado de sistemas externos (MOCK) ───────────────────────
@@ -785,4 +807,21 @@ model MockScenario {
   isActive      Boolean @default(false)
   remainingUses Int? // null = permanente
   params        Json?
+}
+
+// ─────────────────────── Asignaciones de personal (ADR-016) ───────────────────────
+
+/// Cartera de un asesor: limita su acceso a los clientes asignados (mínimo privilegio).
+model PortfolioAssignment {
+  id         String       @id @default(cuid())
+  actorId    String
+  actor      ActorAccount @relation(fields: [actorId], references: [id])
+  customerId String
+  customer   Customer     @relation(fields: [customerId], references: [id])
+  validFrom  DateTime
+  validTo    DateTime?
+  createdAt  DateTime     @default(now())
+
+  @@index([customerId])
+  @@index([actorId])
 }

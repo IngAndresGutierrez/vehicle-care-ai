@@ -50,11 +50,35 @@ export interface SeedSummary {
   seeded: boolean;
 }
 
-/** Siembra una base vacía. Si ya está sembrada no hace nada (las tablas auditables son append-only). */
+/**
+ * Siembra una base vacía. Si ya está sembrada no repite la carga base (las tablas auditables son append-only)
+ * pero sí completa, de forma idempotente, los datos añadidos en fases posteriores.
+ */
 export async function seedDemoData(db: Db): Promise<SeedSummary> {
   const existing = await db.communicationPolicy.findUnique({ where: { id: DEMO_IDS.communicationPolicy } });
-  if (existing) return { seeded: false };
+  if (!existing) await seedBase(db);
+  await seedPortfolioAssignments(db);
+  return { seeded: !existing };
+}
 
+/**
+ * Fase 3 (ADR-016): el asesor demo atiende la cartera de C1 y C2. C3 queda fuera a propósito, para
+ * demostrar que el asesor no accede a vehículos que no tiene asignados.
+ */
+async function seedPortfolioAssignments(db: Db): Promise<void> {
+  const { customers: C, actors: A } = DEMO_IDS;
+  await db.portfolioAssignment.createMany({
+    data: [C.c1, C.c2].map((customerId) => ({
+      id: `pf-${A.advisor}-${customerId}`,
+      actorId: A.advisor,
+      customerId,
+      validFrom: D("2026-08-01T05:00:00Z"),
+    })),
+    skipDuplicates: true,
+  });
+}
+
+async function seedBase(db: Db): Promise<void> {
   const { vehicles: V, specs: S, customers: C, workshops: W, actors: A } = DEMO_IDS;
 
   await db.$transaction(async (tx) => {
@@ -292,6 +316,4 @@ export async function seedDemoData(db: Db): Promise<SeedSummary> {
       ],
     });
   });
-
-  return { seeded: true };
 }

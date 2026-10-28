@@ -61,6 +61,12 @@ export function addMonthsClamped(date: IsoLocalDate, months: number): IsoLocalDa
   return format({ year: targetYear, month: targetMonth, day: Math.min(day, daysInMonth(targetYear, targetMonth)) });
 }
 
+export function addDaysToLocalDate(date: IsoLocalDate, days: number): IsoLocalDate {
+  if (!Number.isInteger(days)) throw new RangeError(`Días no enteros: ${days}`);
+  const d = new Date((toEpochDay(date) + days) * MS_PER_DAY);
+  return format({ year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() });
+}
+
 /** Días de calendario de `from` a `to` (negativo si `to` es anterior). */
 export function daysBetween(from: IsoLocalDate, to: IsoLocalDate): number {
   return toEpochDay(to) - toEpochDay(from);

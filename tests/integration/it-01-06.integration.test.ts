@@ -7,11 +7,13 @@ import type { ActorContext } from "@/domain/policies/access-policy";
 import { fixedClock } from "@/infra/clock";
 import { DEMO_IDS, SEED_SOURCE_PREFIX } from "@/infra/seed/demo-seed";
 import { expectDbRejection } from "./helpers/assertions";
+import { MockNotificationPort } from "@/integrations/mock/mock-notifications";
 import { connectTestDb, resetAndSeed } from "./helpers/test-db";
 
 const db = connectTestDb();
 const clock = fixedClock(DEMO_NOW.toISOString());
 const deps = { db, clock };
+const jobDeps = () => ({ db, clock, notifications: new MockNotificationPort() });
 const { vehicles: V, customers: C, actors: A, workshops: W } = DEMO_IDS;
 
 const owner = (actorId: string, customerId: string): ActorContext => ({ actorId, role: "OWNER", customerId, workshopId: null });
@@ -141,7 +143,7 @@ describe("IT-04 acceso denegado por defecto", () => {
 
 describe("IT-05 job de evaluación y consentimiento (EX-04)", () => {
   it("sin MAINTENANCE_REMINDERS el recordatorio queda SUPPRESSED, sin consentEventId y con motivo", async () => {
-    const items = await runEvaluationJob(deps, { actor: SYSTEM_JOB, traceId: "trc-it05" });
+    const items = await runEvaluationJob(jobDeps(), { actor: SYSTEM_JOB, traceId: "trc-it05" });
 
     const v2Oil = items.find((i) => i.vehicleId === V.v2 && i.serviceCode === "ENGINE_OIL_FILTER");
     expect(v2Oil?.evaluation).toMatchObject({ status: "DUE" });
@@ -157,10 +159,17 @@ describe("IT-05 job de evaluación y consentimiento (EX-04)", () => {
       suppressionReason: "CONSENT_REQUIRED",
       dataOrigin: "SYNTHETIC",
     });
+    // Completado en Fase 3: el journey registra la supresión (CONTACT_SUPPRESSED).
+    const journey = await db.journeyInstance.findFirstOrThrow({ where: { vehicleId: V.v2, serviceCode: "ENGINE_OIL_FILTER" }, include: { events: { orderBy: { seq: "asc" } } } });
+    expect(journey.state).toBe("CONTACT_SUPPRESSED");
+    expect(journey.events.map((e) => [e.type, e.toState])).toEqual([
+      ["EVALUATED", "NEED_DETECTED"],
+      ["CONTACT_SUPPRESSED", "CONTACT_SUPPRESSED"],
+    ]);
   });
 
   it("con consentimiento vigente el recordatorio se registra (simulado) con la evidencia usada", async () => {
-    const items = await runEvaluationJob(deps, { actor: SYSTEM_JOB, traceId: "trc-it05b" });
+    const items = await runEvaluationJob(jobDeps(), { actor: SYSTEM_JOB, traceId: "trc-it05b" });
     const v1Oil = items.find((i) => i.vehicleId === V.v1 && i.serviceCode === "ENGINE_OIL_FILTER");
     expect(v1Oil?.evaluation).toMatchObject({ status: "UPCOMING" });
     expect(v1Oil?.reminder).toMatchObject({
@@ -171,7 +180,7 @@ describe("IT-05 job de evaluación y consentimiento (EX-04)", () => {
   });
 
   it("solo los estados UPCOMING/DUE/OVERDUE generan mensajes; UNKNOWN, NOT_DUE y NOT_APPLICABLE no", async () => {
-    const items = await runEvaluationJob(deps, { actor: SYSTEM_JOB, traceId: "trc-it05c" });
+    const items = await runEvaluationJob(jobDeps(), { actor: SYSTEM_JOB, traceId: "trc-it05c" });
     const summary = Object.fromEntries(
       items.map((i) => [`${i.vehicleId}/${i.serviceCode}`, "status" in i.evaluation ? i.evaluation.status : i.evaluation.error.code]),
     );
@@ -206,6 +215,7 @@ describe("IT-06 eventos del journey append-only", () => {
         actorId: A.systemJob,
         actorRole: "SYSTEM_JOB",
         traceId: "trc-it06",
+        idempotencyKey: "it06-evaluated",
       },
     });
 

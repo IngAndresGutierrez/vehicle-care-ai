@@ -216,18 +216,22 @@ Pipeline para cada `tool_use`:
 10. **Registro** `ToolCall` (input redactado, resumen de salida, `errorCode`, `durationMs`, `source`).
 11. **Proyección para el modelo**: salida compacta sin PII; errores con `userSafeMessage` y `nextStep`.
 
-### 4.1 Matriz rol × operación
+### 4.1 Matriz rol × operación (actualizada en Fase 3, ADR-016)
 
 | Operación | OWNER (vía agente) | ADVISOR | WORKSHOP_* | COMPLIANCE | SYSTEM_JOB |
 |---|---|---|---|---|---|
-| Lecturas del vehículo propio | ✅ | ✅ | ✅ (vehículos con OT) | ✅ (auditoría) | ✅ |
+| Lecturas del vehículo | ✅ titular vigente | ✅ solo cartera del titular vigente o caso asignado | ✅ vehículos con OT/servicio propio | ❌ (solo caso asignado) | ❌ |
+| Evaluar mantenimiento | ✅ | ✅ cartera o caso asignado | ❌ | ❌ | ✅ |
+| Auditoría de trazas (`AUDIT_READ`) | ❌ | ❌ | ❌ | ✅ con justificación registrada | ❌ |
 | `recordOdometer` | ✅ `OWNER_DECLARED` | ✅ | ✅ `WORKSHOP_VERIFIED` | ❌ | ❌ |
 | `getQuote`, `getAvailableSlots`, `prepareBooking` | ✅ | ✅ | ❌ | ❌ | ❌ |
 | `confirmBooking` | ✅ solo clic | ✅ | ❌ | ❌ | ❌ |
 | `createHumanCase` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `resolveHumanCase` / salir de `SAFETY_ESCALATED` | ❌ | ✅ | ❌ | ✅ | ❌ |
+| `resolveHumanCase` / salir de `SAFETY_ESCALATED` | ❌ | ✅ si está asignado | ❌ | ✅ si está asignado | ❌ |
 | `completeWorkOrder` | ❌ | ❌ | ✅ | ❌ | ❌ |
 | Validar plan técnico | ❌ | ❌ | ❌ | ✅ (responsable técnico **[PRD §14.4]**) | ❌ |
+
+Las herramientas disponibles dependen además del estado del journey: `allowedTools(state)` en `src/domain/journey/tools.ts`.
 
 ### 4.2 Mapa error → comportamiento del agente
 

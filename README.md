@@ -8,7 +8,7 @@ PRD, `ARCHITECTURE.md`, `DATA_MODEL.md`, `AGENT_DESIGN.md`, `IMPLEMENTATION_PLAN
 
 ## Estado
 
-Fases 0 (scaffold), 1 (Maintenance Engine) y 2 (persistencia, seed sintético, políticas de acceso y consentimiento, evaluación sobre PostgreSQL) implementadas. Journey, agente, reservas, UI e integraciones: pendientes.
+Fases 0 (scaffold), 1 (Maintenance Engine), 2 (persistencia, seed, políticas, evaluación sobre PostgreSQL) y 3 (máquina de estados del journey, idempotencia, deduplicación de recordatorios, mínimo privilegio, escalamiento de seguridad) implementadas. Agente, reservas, UI e integraciones reales: pendientes. La mensajería es un mock que nunca envía.
 
 ## Requisitos
 

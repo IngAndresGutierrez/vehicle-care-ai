@@ -246,7 +246,7 @@ Regla sintética 5.000 km / 12 meses, último servicio 70.000 km el 2026-04-01, 
 
 ## 6. Máquina de estados del journey (UC-01)
 
-Implementación: tabla de transiciones TypeScript pura (`domain/journey/machine.ts`), sin librería **[D-07: XState vs tabla propia]**. Persistencia: `JourneyInstance.state` + `version` (bloqueo optimista) y `JourneyEvent` append-only. El estado se reconstruye o valida desde eventos en tests.
+**Implementado en Fase 3** (ADR-015): tabla declarativa pura en `src/domain/journey/machine.ts` (sin librería; resuelve D-07), `allowedTools(state)` en `tools.ts`, reproducción y verificación en `replay.ts`. Los eventos se aplican con `src/application/journey/journey-store.ts`. Persistencia: `JourneyInstance.state` + `version` (bloqueo optimista) y `JourneyEvent` append-only. El estado se reconstruye o valida desde eventos en tests.
 
 ### 6.1 Estados
 
@@ -417,6 +417,8 @@ El catálogo de casos está en `IMPLEMENTATION_PLAN.md §4`.
 | [ADR-012](./adr/ADR-012-vencimiento-tecnico-vs-comunicacion.md) | Separar vencimiento técnico, política de comunicación y política de calidad de datos | Una sola `CommunicationPolicy` | Los umbrales comerciales nunca deben cambiar si un servicio está técnicamente vencido |
 | [ADR-013](./adr/ADR-013-decisiones-fase-0-1.md) | Decisiones provisionales adoptadas para Fases 0–1 | — | Desbloquear la implementación con decisiones reversibles y documentadas |
 | [ADR-014](./adr/ADR-014-persistencia-fase-2.md) | Persistencia de Fase 2: ajustes de esquema, invariantes SQL null-safe, append-only ampliado, verificación de migraciones en base desechable | Reset con Prisma | Integridad garantizada por la BD y migraciones reproducibles sin operaciones destructivas |
+| [ADR-015](./adr/ADR-015-journey-fsm-idempotencia-contacto.md) | FSM declarativa pura; eventos idempotentes con bloqueo optimista; deduplicación de recordatorios por ciclo/política/ventana; outbox simplificado | XState; dedup por `inputHash` | Determinismo, auditoría y ausencia de duplicados ante reintentos y concurrencia |
+| [ADR-016](./adr/ADR-016-minimo-privilegio-personal.md) | Asesor por cartera o caso asignado; compliance solo auditoría justificada o caso asignado; resolución solo por asignación | Acceso amplio por rol | Mínimo privilegio y Ley 1581 |
 
 ---
 
@@ -432,7 +434,7 @@ El catálogo de casos está en `IMPLEMENTATION_PLAN.md §4`.
 | D-04 | ¿El alistamiento de entrega (PDI) con cambio de aceite documentado sirve como línea base? | Sí si hay OT del taller / No | **Implementada (ADR-013):** solo si la regla lo permite (`allowDeliveryBaseline`); por defecto no | Responsable técnico + operación |
 | D-05 | Aritmética de meses y zona horaria | `date-fns` + `@date-fns/tz` vs `Temporal` | **Implementada (ADR-013):** módulo propio sin dependencias (`Intl` + días epoch), clamp a fin de mes | Arquitectura |
 | D-06 | Proyección de km por uso promedio | No / Sí con etiqueta «estimado» | No en MVP (evita «cifras inventadas»); P1 | Producto |
-| D-07 | Implementación FSM | Tabla TS propia vs XState v5 | Tabla propia (pocos estados, 100 % testeable, sin dependencia) | Arquitectura |
+| D-07 | Implementación FSM | Tabla TS propia vs XState v5 | **Implementada (ADR-015):** tabla declarativa propia | Arquitectura |
 | D-08 | Persistencia de mocks | Postgres (`Mock*`) vs memoria | Postgres | Arquitectura |
 | D-09 | Cierre de taller en demo: ¿`SIMULATED` o `WORKSHOP_VERIFIED` con actor demo? | — | **Resuelta (ADR-011):** `WORKSHOP_VERIFIED` + `dataOrigin=SYNTHETIC` | Producto |
 | D-10 | CRM/DMS/agenda reales de la agencia | — | Desconocido; puertos neutrales | Cliente (PRD §14.5) |
@@ -450,6 +452,10 @@ El catálogo de casos está en `IMPLEMENTATION_PLAN.md §4`.
 | D-22 | Hosting y región de datos | Vercel + Postgres gestionado (región) | Definir región; impacta D-13 | Cliente/jurídico |
 | D-29 | ¿Un servicio solo declarado por el propietario (sin documento) sirve como línea base? | Sí / No / Sí con etiqueta | **Adoptada provisional (ADR-013):** No → `UNKNOWN[BASELINE_NOT_DOCUMENTED]`; `PRIOR_OWNER_DOCUMENT` sí | Responsable técnico + producto |
 | D-30 | Valores reales de intervalos por referencia de vehículo | — | Pendiente: solo de manuales/planes técnicos aprobados (PRD §14.1, §14.4); el MVP usa reglas `SYNTHETIC-DEMO` | Responsable técnico de la agencia |
+| D-31 | Frecuencia de recordatorios | — | **Provisional (ADR-015):** separación mínima 14 días, máximo 2 por ciclo, configurable en `CommunicationPolicy` | Producto/comercial + jurídico |
+| D-32 | SLA de casos de seguridad | — | **Provisional:** 30 minutos (`SAFETY_SLA_MINUTES`) | Operación de la agencia |
+| D-33 | Reapertura de un journey `CLOSED` (journey único por vehículo+servicio) | Nuevo journey por ciclo / reapertura humana | Pendiente (P1) | Producto |
+| D-34 | Alcance por agencia/sede y rol supervisor | — | Pendiente (ADR-016) | Cliente |
 
 ### 12.2 Supuestos
 

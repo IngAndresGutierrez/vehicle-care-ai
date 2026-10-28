@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonthsClamped, compareLocalDates, daysBetween, isValidLocalDate, toLocalDate } from "../local-date";
+import { addDaysToLocalDate, addMonthsClamped, compareLocalDates, daysBetween, isValidLocalDate, toLocalDate } from "../local-date";
 
 describe("local-date", () => {
   it("ME-17 fin de mes: 2026-01-31 + 1 mes = 2026-02-28", () => {
@@ -42,5 +42,12 @@ describe("local-date", () => {
     expect(isValidLocalDate("2026-1-01")).toBe(false);
     expect(isValidLocalDate(20261028)).toBe(false);
     expect(() => addMonthsClamped("2026-02-30", 1)).toThrow(RangeError);
+  });
+
+  it("suma días de calendario cruzando meses y años", () => {
+    expect(addDaysToLocalDate("2026-10-28", 14)).toBe("2026-11-11");
+    expect(addDaysToLocalDate("2026-12-31", 1)).toBe("2027-01-01");
+    expect(addDaysToLocalDate("2028-03-01", -1)).toBe("2028-02-29");
+    expect(() => addDaysToLocalDate("2026-10-28", 1.5)).toThrow(RangeError);
   });
 });

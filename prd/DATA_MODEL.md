@@ -39,7 +39,7 @@ Mock*: MockCatalogPrice · MockSlot · MockBooking · MockWorkOrder · MockScena
 
 ## 3. `prisma/schema.prisma` (propuesto)
 
-> **Implementado en Fase 2.** Copia de `prisma/schema.prisma` (fuente de verdad) al 2026-10-28. Prisma 7.10.1: generador `prisma-client` con `output`; URL en `prisma.config.ts`. Cambios respecto al borrador previo en ADR-014.
+> **Implementado en Fases 2–3.** Copia de `prisma/schema.prisma` (fuente de verdad) al 2026-10-28. Fase 3 añade `JourneyInstance.context`, `JourneyEvent.idempotencyKey`, deduplicación en `OutboundMessage`, frecuencia en `CommunicationPolicy`, `PortfolioAssignment` y `HumanCase.journeyId` (ADR-015/016). Prisma 7.10.1: generador `prisma-client` con `output`; URL en `prisma.config.ts`. Cambios respecto al borrador previo en ADR-014.
 
 ```prisma
 // Vehicle Care — modelo de datos (prd/DATA_MODEL.md §3, ADR-009…ADR-014).
@@ -248,6 +248,8 @@ model Customer {
   syntheticSourceRef String?
   createdAt          DateTime   @default(now())
 
+  portfolioAssignments PortfolioAssignment[]
+
   ownerships    VehicleOwnership[]
   consents      Consent[]
   actorAccounts ActorAccount[]
@@ -263,6 +265,8 @@ model ActorAccount {
   workshop    Workshop? @relation(fields: [workshopId], references: [id])
   isDemo      Boolean   @default(true)
   createdAt   DateTime  @default(now())
+
+  portfolioAssignments PortfolioAssignment[]
 
   @@index([role])
 }
@@ -388,16 +392,18 @@ model MaintenanceRule {
 
 /// Umbrales comerciales de comunicación (ADR-012). Nunca alteran el vencimiento técnico.
 model CommunicationPolicy {
-  id                 String     @id @default(cuid())
-  version            String     @unique
-  leadKm             Int // [D-02] → UPCOMING
-  leadDays           Int
-  overdueGraceKm     Int // [D-01] → OVERDUE
-  overdueGraceDays   Int
-  dataOrigin         DataOrigin
-  syntheticSourceRef String?
-  isActive           Boolean    @default(false)
-  createdAt          DateTime   @default(now())
+  id                      String     @id @default(cuid())
+  version                 String     @unique
+  leadKm                  Int // [D-02] → UPCOMING
+  leadDays                Int
+  overdueGraceKm          Int // [D-01] → OVERDUE
+  overdueGraceDays        Int
+  minDaysBetweenReminders Int        @default(14) // separación mínima y ancho de ventana de contacto (ADR-015)
+  maxRemindersPerCycle    Int        @default(2) // tope de recordatorios enviados por ciclo
+  dataOrigin              DataOrigin
+  syntheticSourceRef      String?
+  isActive                Boolean    @default(false)
+  createdAt               DateTime   @default(now())
 }
 
 /// Calidad de datos (ADR-012): cuándo una lectura de odómetro deja de ser concluyente.
@@ -476,6 +482,8 @@ model MaintenanceEvaluation {
   planVersionLabel             String? // snapshot de la versión citada
   planSourceRef                String? // snapshot de la fuente citada (SYNTHETIC-DEMO:… si es demo)
   ruleId                       String?
+  baselineServiceRecordId      String? // servicio de referencia del ciclo evaluado
+  cycleKey                     String? // clave estable del ciclo (vehículo, servicio, regla, servicio de referencia)
   asOfLocalDate                DateTime                @db.Date // fecha de negocio America/Bogota
   commPolicyVersion            String
   dataQualityPolicyVersion     String
@@ -487,6 +495,8 @@ model MaintenanceEvaluation {
   decisionTrace                Json
   evaluatedAt                  DateTime
   traceId                      String?
+
+  outboundMessages OutboundMessage[]
 
   @@index([vehicleId, serviceCode, evaluatedAt])
 }
@@ -627,24 +637,27 @@ model WorkOrder {
 // ─────────────────────── Casos humanos ───────────────────────
 
 model HumanCase {
-  id             String          @id @default(cuid())
+  id             String           @id @default(cuid())
   vehicleId      String
-  vehicle        Vehicle         @relation(fields: [vehicleId], references: [id])
+  vehicle        Vehicle          @relation(fields: [vehicleId], references: [id])
+  journeyId      String? // journey (vehículo + servicio) afectado por el caso (ADR-015)
+  journey        JourneyInstance? @relation(fields: [journeyId], references: [id])
   reason         HumanCaseReason
   priority       CasePriority
-  status         CaseStatus      @default(OPEN)
+  status         CaseStatus       @default(OPEN)
   assigneeRole   ActorRole // ADVISOR, COMPLIANCE, ...
   assigneeId     String?
   minimalContext Json // resumen mínimo, sin PII innecesaria
   slaDueAt       DateTime
-  idempotencyKey String          @unique
+  idempotencyKey String           @unique
   openedById     String
   traceId        String
   resolution     String?
   resolvedAt     DateTime?
-  createdAt      DateTime        @default(now())
+  createdAt      DateTime         @default(now())
 
   @@index([status, priority, slaDueAt])
+  @@index([journeyId])
 }
 
 // ─────────────────────── Journey (FSM + eventos) ───────────────────────
@@ -657,25 +670,28 @@ model JourneyInstance {
   serviceCode String
   state       JourneyState
   version     Int            @default(0) // bloqueo optimista
+  context     Json           @default("{}") // JourneyContext de la FSM, se actualiza con el estado (ADR-015)
   updatedAt   DateTime       @updatedAt
   events      JourneyEvent[]
+  humanCases  HumanCase[]
 
   @@unique([vehicleId, useCase, serviceCode])
 }
 
 model JourneyEvent {
-  id         String          @id @default(cuid())
-  journeyId  String
-  journey    JourneyInstance @relation(fields: [journeyId], references: [id])
-  seq        Int // = version tras aplicar
-  type       String // EVALUATED, BOOKING_CONFIRMED, SAFETY_SIGNAL...
-  fromState  JourneyState
-  toState    JourneyState
-  payload    Json
-  actorId    String
-  actorRole  ActorRole
-  traceId    String
-  occurredAt DateTime        @default(now())
+  id             String          @id @default(cuid())
+  journeyId      String
+  journey        JourneyInstance @relation(fields: [journeyId], references: [id])
+  seq            Int // = version tras aplicar
+  type           String // EVALUATED, BOOKING_CONFIRMED, SAFETY_SIGNAL...
+  fromState      JourneyState
+  toState        JourneyState
+  payload        Json
+  actorId        String
+  actorRole      ActorRole
+  traceId        String
+  idempotencyKey String?         @unique // obligatorio en filas nuevas (CHECK NOT VALID); reintentos no duplican eventos
+  occurredAt     DateTime        @default(now())
 
   @@unique([journeyId, seq])
   @@index([traceId])
@@ -759,20 +775,26 @@ model AuditLog {
 }
 
 model OutboundMessage {
-  id                 String         @id @default(cuid())
+  id                 String                 @id @default(cuid())
   customerId         String
   vehicleId          String
   channel            Channel
   purpose            ConsentPurpose
   templateId         String
   consentEventId     String? // opt-in usado; null solo si SUPPRESSED (ADR-010)
-  consentEvent       ConsentEvent?  @relation(fields: [consentEventId], references: [id])
+  consentEvent       ConsentEvent?          @relation(fields: [consentEventId], references: [id])
   status             String // SIMULATED_SENT | SUPPRESSED
   suppressionReason  String? // p.ej. CONSENT_REQUIRED; obligatorio si SUPPRESSED
   dataOrigin         DataOrigin
   syntheticSourceRef String?
+  dedupKey           String?                @unique // ciclo + política + ventana (ADR-015); obligatorio en filas nuevas
+  cycleKey           String?
+  evaluationId       String?
+  evaluation         MaintenanceEvaluation? @relation(fields: [evaluationId], references: [id])
   traceId            String
-  createdAt          DateTime       @default(now())
+  createdAt          DateTime               @default(now())
+
+  @@index([cycleKey, status])
 }
 
 // ─────────────────────── Estado de sistemas externos (MOCK) ───────────────────────
@@ -830,6 +852,23 @@ model MockScenario {
   remainingUses Int? // null = permanente
   params        Json?
 }
+
+// ─────────────────────── Asignaciones de personal (ADR-016) ───────────────────────
+
+/// Cartera de un asesor: limita su acceso a los clientes asignados (mínimo privilegio).
+model PortfolioAssignment {
+  id         String       @id @default(cuid())
+  actorId    String
+  actor      ActorAccount @relation(fields: [actorId], references: [id])
+  customerId String
+  customer   Customer     @relation(fields: [customerId], references: [id])
+  validFrom  DateTime
+  validTo    DateTime?
+  createdAt  DateTime     @default(now())
+
+  @@index([customerId])
+  @@index([actorId])
+}
 ```
 
 ---
@@ -857,7 +896,12 @@ Prisma no expresa todo; se añaden en una migración SQL manual (`prisma migrate
 | `Quote` ACTIVE ⇒ total y vigencia; UNAVAILABLE ⇒ sin montos · `WorkOrder` COMPLETED ⇒ cierre registrado · `HumanCase` SAFETY ⇒ URGENT y resuelto ⇒ fecha · `MockSlot` 0 ≤ remaining ≤ capacity | `CHECK` |
 | Append-only también en `OdometerReading`, `ServiceRecord` y `OutboundMessage` | Trigger `vc_forbid_mutation` (SQLSTATE `P0A01`) |
 
-**Migraciones:** `prisma/migrations/` — `baseline` → `phase2_data_model` (tablas generadas por Prisma) → `phase2_invariants` → `phase2_rule_timing_scope` → `phase2_append_only_errcode` → `phase2_null_safe_checks`. Se verifican desde una base vacía con `pnpm db:verify-migrations`.
+| `JourneyEvent`: tipo dentro del catálogo de eventos de negocio; `idempotencyKey` obligatoria y única; `seq ≥ 1` y único por journey | `CHECK … NOT VALID` + índices únicos (ADR-015) |
+| `OutboundMessage`: `dedupKey` (única) y `cycleKey` obligatorias | `CHECK … NOT VALID` + índice único (ADR-015) |
+| `CommunicationPolicy`: `minDaysBetweenReminders ≥ 1`, `maxRemindersPerCycle ≥ 0` | `CHECK` |
+| `PortfolioAssignment`: rango válido; una asignación activa por asesor y cliente | `CHECK` + índice único parcial (ADR-016) |
+
+**Migraciones:** `prisma/migrations/` — `baseline` → `phase2_data_model` (tablas generadas por Prisma) → `phase2_invariants` → `phase2_rule_timing_scope` → `phase2_append_only_errcode` → `phase2_null_safe_checks` → `phase3_journey_contact_scope` → `phase3_case_journey_link`. Se verifican desde una base vacía con `pnpm db:verify-migrations`.
 
 **Nota de SQL:** un `CHECK` que evalúa a `NULL` se considera satisfecho. Toda condición sobre columnas opcionales usa `IS NULL`/`IS NOT NULL` explícitos (corregido en `phase2_null_safe_checks`).
 

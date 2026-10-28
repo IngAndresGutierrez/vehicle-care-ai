@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: vehicle-care-postgres
+    environment:
+      POSTGRES_USER: vehicle_care
+      POSTGRES_PASSWORD: vehicle_care
+      POSTGRES_DB: vehicle_care
+    ports:
+      - "54329:5432"
+    volumes:
+      - vehicle-care-pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vehicle_care -d vehicle_care"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  vehicle-care-pgdata:

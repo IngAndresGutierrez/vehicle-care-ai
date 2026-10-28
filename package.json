@@ -1,0 +1,55 @@
+{
+  "name": "vehicle-care",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run --project unit",
+    "test:watch": "vitest --project unit",
+    "test:coverage": "vitest run --project unit --coverage",
+    "test:integration": "vitest run --project integration",
+    "test:evals": "vitest run --project evals",
+    "validate": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:integration",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:migrate": "prisma migrate dev",
+    "db:status": "prisma migrate status",
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "db:test:migrate": "PRISMA_TARGET=test prisma migrate deploy",
+    "db:verify-migrations": "tsx scripts/verify-migrations.ts"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "next": "16.4.3",
+    "pg": "^8.23.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "5.0.5",
+    "dotenv": "^18.0.9",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.3",
+    "fast-check": "4.10.2",
+    "prisma": "7.10.1",
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "5.0.5"
+  },
+  "packageManager": "pnpm@12.8.1",
+  "engines": {
+    "node": ">=24"
+  }
+}

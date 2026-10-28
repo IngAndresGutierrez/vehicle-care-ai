@@ -52,7 +52,7 @@ Sin bloqueo inmediato (pueden resolverse en paralelo): D-12/D-13 (jurídico), D-
 - Casos de uso: `request-quote`, `list-slots`, `prepare-booking`, `confirm-booking` (idempotente), `open-human-case`, `record-odometer`, `complete-work-order`.
 - **Hecho cuando:** IT-07…IT-16 en verde (incluida concurrencia de cupo y doble confirmación).
 
-### Fase 5 — Agente: gateway, herramientas, orquestador (≈3 h) · AC04, AC05, AC06, AC07, AC08
+### Fase 5 — Agente: gateway, herramientas, orquestador (≈3 h) · AC04, AC05, AC06, AC07, AC08 · ✅ implementada 28-oct-2026 (pendiente de revisión)
 
 - `agent/tools/*` (Zod → JSON Schema), `gateway.ts`, `orchestrator.ts`, `LlmPort` + `AnthropicLlm` + `ScriptedLlm`.
 - `safety/lexicon.ts` + plantilla, `output-guard.ts`, memoria estructurada, prompt `advisor-v1`.

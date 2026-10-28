@@ -8,7 +8,7 @@ PRD, `ARCHITECTURE.md`, `DATA_MODEL.md`, `AGENT_DESIGN.md`, `IMPLEMENTATION_PLAN
 
 ## Estado
 
-Fases 0 (scaffold), 1 (Maintenance Engine), 2 (persistencia, seed, políticas, evaluación sobre PostgreSQL), 3 (máquina de estados del journey, idempotencia, deduplicación de recordatorios, mínimo privilegio, escalamiento de seguridad) y 4 (cotización, cupos, intención y confirmación de reservas, órdenes de trabajo; taller y CRM MOCK) implementadas. Agente, UI e integraciones reales: pendientes. Taller, CRM y mensajería son simulados (MOCK): la mensajería nunca envía.
+Fases 0 (scaffold), 1 (Maintenance Engine), 2 (persistencia, seed, políticas, evaluación sobre PostgreSQL), 3 (máquina de estados del journey, idempotencia, deduplicación de recordatorios, mínimo privilegio, escalamiento de seguridad), 4 (cotización, cupos, intención y confirmación de reservas, órdenes de trabajo; taller y CRM MOCK) y 5 (agente MaintenanceAdvisor, Tool Gateway, API `/api/agent/turn`) implementadas. UI e integraciones reales: pendientes. Taller, CRM y mensajería son simulados (MOCK): la mensajería nunca envía.
 
 ## Requisitos
 
@@ -25,6 +25,8 @@ pnpm db:seed                    # seed sintético (idempotente: no modifica una 
 pnpm db:test:migrate            # aplica migraciones a vehicle_care_test
 pnpm db:verify-migrations       # base desechable: migraciones desde cero + drift + seed
 pnpm demo:booking-flow          # base desechable: flujo cotización → reserva con evidencia en prd/reports/evidence/
+pnpm demo:agent-journeys        # base desechable: 4 recorridos del agente vía API (ScriptedLlm = simulación determinista)
+pnpm test:journeys              # E2E del agente (E2E-01…05 + adversariales)
 
 pnpm lint                       # ESLint (incluye la frontera del dominio)
 pnpm typecheck                  # next typegen + tsc --noEmit
@@ -45,3 +47,9 @@ src/infra/                      Prisma, reloj, ids, logger, seed sintético
 prisma/                         esquema, migraciones (con invariantes SQL) y seed
 tests/integration/              tests contra PostgreSQL
 ```
+
+## Agente (Fase 5)
+
+- `LLM_PROVIDER=scripted` (por defecto): **simulación determinista por reglas, no IA generativa**; no requiere API key.
+- `LLM_PROVIDER=anthropic`: Claude vía SDK oficial (`LLM_MODEL`, por defecto `claude-opus-5-5`); requiere `ANTHROPIC_API_KEY`.
+- API: `POST /api/agent/turn`, `POST /api/bookings/confirm`, `POST /api/demo/session` (solo `DEMO_MODE=true`). Contratos en `prd/PHASE6_HANDOFF.md`.

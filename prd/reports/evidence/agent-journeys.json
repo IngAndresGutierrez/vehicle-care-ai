@@ -1,0 +1,1214 @@
+{
+  "generatedWith": "pnpm demo:agent-journeys",
+  "llm": "ScriptedLlm — SIMULACIÓN DETERMINISTA por reglas; no es IA generativa",
+  "note": "Taller, CRM y datos del vehículo son simulados (MOCK/SYNTHETIC-DEMO). Tokens de confirmación redactados.",
+  "clock": "2026-10-28T17:00:00.000Z",
+  "journeys": [
+    {
+      "title": "A) Camino exitoso",
+      "actorId": "act-owner-c1",
+      "vehicleId": "veh-demo-v1",
+      "serviceCode": "ENGINE_OIL_FILTER",
+      "turns": [
+        {
+          "user": "¿Qué mantenimiento le toca a mi carro?",
+          "httpStatus": 200,
+          "response": {
+            "traceId": "trc_b070630f-cc89-41e2-a2de-e6f0513c4462",
+            "sessionId": "cmvsmm23n0012ezy5t5irip7p",
+            "assistant": {
+              "text": "Según el plan demo-2026.10-r1 (regla de demostración sintética), el cambio de aceite y filtro está próximo: vence a los 75.000 km o el 2027-04-01 y faltan 800 km. ¿Quieres que te consulte una cotización?",
+              "kind": "ASSISTANT",
+              "simulated": true,
+              "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)"
+            },
+            "cards": [
+              {
+                "type": "EVALUATION",
+                "evaluationId": "cmvsmm2420017ezy51g6et2fe",
+                "serviceCode": "ENGINE_OIL_FILTER",
+                "status": "UPCOMING",
+                "technicalStatus": "NOT_DUE",
+                "dueBy": {
+                  "km": 75000,
+                  "date": "2027-04-01"
+                },
+                "remaining": {
+                  "km": 800,
+                  "days": 155
+                },
+                "reasons": [
+                  "WITHIN_INTERVAL",
+                  "KM_WITHIN_LEAD"
+                ],
+                "suggestedAction": "OFFER_QUOTE",
+                "requiresOdometerConfirmation": false,
+                "plan": {
+                  "version": "demo-2026.10-r1",
+                  "sourceRef": "SYNTHETIC-DEMO: plan ficticio basado en el ejemplo sintético del PRD §7"
+                },
+                "syntheticData": true
+              }
+            ],
+            "journey": {
+              "state": "RECOMMENDATION_PRESENTED",
+              "allowedTools": [
+                "getVehicleProfile",
+                "getServiceHistory",
+                "getMaintenancePlan",
+                "recordOdometer",
+                "evaluateMaintenance",
+                "createHumanCase",
+                "listWorkshops",
+                "getQuote"
+              ]
+            },
+            "trace": {
+              "toolCalls": [
+                {
+                  "tool": "evaluateMaintenance",
+                  "ok": true,
+                  "errorCode": null,
+                  "source": "INTERNAL",
+                  "durationMs": 8,
+                  "journeyStateAtCall": "CONVERSATION_OPEN",
+                  "summary": "status=UPCOMING; plan=demo-2026.10-r1; motor=1.0.0"
+                }
+              ],
+              "llm": {
+                "provider": "SCRIPTED",
+                "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)",
+                "iterations": 2,
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "stopReason": "end_turn"
+              },
+              "safety": {
+                "triggered": false,
+                "categories": []
+              },
+              "guard": {
+                "blocked": false,
+                "violations": []
+              },
+              "flags": []
+            },
+            "errors": []
+          }
+        },
+        {
+          "user": "¿Cuánto cuesta?",
+          "httpStatus": 200,
+          "response": {
+            "traceId": "trc_9b027534-6eaa-4072-b75f-575df65d7769",
+            "sessionId": "cmvsmm23n0012ezy5t5irip7p",
+            "assistant": {
+              "text": "Talleres disponibles: Taller Norte (demo), Taller Sur (demo). La cotización del taller es de $333.200 (subtotal $280.000 más impuestos de $53.200), válida hasta el 2026-10-30. Es un precio del catálogo simulado de demostración. ¿Te muestro los horarios disponibles?",
+              "kind": "ASSISTANT",
+              "simulated": true,
+              "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)"
+            },
+            "cards": [
+              {
+                "type": "WORKSHOPS",
+                "workshops": [
+                  {
+                    "workshopId": "ws-demo-t1",
+                    "name": "Taller Norte (demo)",
+                    "city": "Ciudad Demo"
+                  },
+                  {
+                    "workshopId": "ws-demo-t2",
+                    "name": "Taller Sur (demo)",
+                    "city": "Ciudad Demo"
+                  }
+                ]
+              },
+              {
+                "type": "QUOTE",
+                "quoteId": "cmvsmm24z001iezy5f0nuf0av",
+                "workshopId": "ws-demo-t1",
+                "isEstimate": false,
+                "subtotalCop": 280000,
+                "taxCop": 53200,
+                "totalCop": 333200,
+                "taxLabel": "IVA 19% (valor sintético del catálogo MOCK)",
+                "includedItems": [
+                  {
+                    "qty": 1,
+                    "description": "Aceite de motor (referencia ficticia)"
+                  },
+                  {
+                    "qty": 1,
+                    "description": "Filtro de aceite (referencia ficticia)"
+                  },
+                  {
+                    "qty": 1,
+                    "description": "Mano de obra"
+                  }
+                ],
+                "restrictions": [
+                  "Precio sintético de demostración: no es una tarifa real.",
+                  "Sujeto a inspección del vehículo en el taller."
+                ],
+                "validUntil": "2026-10-30T17:00:00.000Z",
+                "catalogVersion": "SYNTHETIC-DEMO:catalogo-mock-v1",
+                "source": "MOCK"
+              }
+            ],
+            "journey": {
+              "state": "QUOTE_PRESENTED",
+              "allowedTools": [
+                "getVehicleProfile",
+                "getServiceHistory",
+                "getMaintenancePlan",
+                "recordOdometer",
+                "evaluateMaintenance",
+                "createHumanCase",
+                "listWorkshops",
+                "getQuote",
+                "getAvailableSlots"
+              ]
+            },
+            "trace": {
+              "toolCalls": [
+                {
+                  "tool": "listWorkshops",
+                  "ok": true,
+                  "errorCode": null,
+                  "source": "INTERNAL",
+                  "durationMs": 4,
+                  "journeyStateAtCall": "RECOMMENDATION_PRESENTED",
+                  "summary": "2 talleres"
+                },
+                {
+                  "tool": "getQuote",
+                  "ok": true,
+                  "errorCode": null,
+                  "source": "MOCK",
+                  "durationMs": 11,
+                  "journeyStateAtCall": "RECOMMENDATION_PRESENTED",
+                  "summary": "cotización cmvsmm24z001iezy5f0nuf0av; total=333200 COP; fuente=MOCK"
+                }
+              ],
+              "llm": {
+                "provider": "SCRIPTED",
+                "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)",
+                "iterations": 3,
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "stopReason": "end_turn"
+              },
+              "safety": {
+                "triggered": false,
+                "categories": []
+              },
+              "guard": {
+                "blocked": false,
+                "violations": []
+              },
+              "flags": []
+            },
+            "errors": []
+          }
+        },
+        {
+          "user": "¿Qué horarios hay?",
+          "httpStatus": 200,
+          "response": {
+            "traceId": "trc_cbd54f34-1fb3-4d0c-bff4-6b9e437d7d64",
+            "sessionId": "cmvsmm23n0012ezy5t5irip7p",
+            "assistant": {
+              "text": "Horarios disponibles: 1) 2026-10-29 a las 08:00; 2) 2026-10-30 a las 08:00; 3) 2026-10-31 a las 10:00. Dime cuál prefieres.",
+              "kind": "ASSISTANT",
+              "simulated": true,
+              "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)"
+            },
+            "cards": [
+              {
+                "type": "SLOTS",
+                "workshopId": "ws-demo-t1",
+                "source": "MOCK",
+                "slots": [
+                  {
+                    "slotRef": "slot-t1-1",
+                    "startsAt": "2026-10-29T13:00:00.000Z",
+                    "endsAt": "2026-10-29T15:00:00.000Z"
+                  },
+                  {
+                    "slotRef": "slot-t1-2",
+                    "startsAt": "2026-10-30T13:00:00.000Z",
+                    "endsAt": "2026-10-30T15:00:00.000Z"
+                  },
+                  {
+                    "slotRef": "slot-t1-3",
+                    "startsAt": "2026-10-31T15:00:00.000Z",
+                    "endsAt": "2026-10-31T17:00:00.000Z"
+                  },
+                  {
+                    "slotRef": "slot-t1-4",
+                    "startsAt": "2026-11-02T19:00:00.000Z",
+                    "endsAt": "2026-11-02T21:00:00.000Z"
+                  }
+                ]
+              }
+            ],
+            "journey": {
+              "state": "SLOT_SELECTION",
+              "allowedTools": [
+                "getVehicleProfile",
+                "getServiceHistory",
+                "getMaintenancePlan",
+                "listWorkshops",
+                "getQuote",
+                "getAvailableSlots",
+                "prepareBooking",
+                "createHumanCase"
+              ]
+            },
+            "trace": {
+              "toolCalls": [
+                {
+                  "tool": "getAvailableSlots",
+                  "ok": true,
+                  "errorCode": null,
+                  "source": "MOCK",
+                  "durationMs": 7,
+                  "journeyStateAtCall": "QUOTE_PRESENTED",
+                  "summary": "4 horarios; fuente=MOCK"
+                }
+              ],
+              "llm": {
+                "provider": "SCRIPTED",
+                "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)",
+                "iterations": 2,
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "stopReason": "end_turn"
+              },
+              "safety": {
+                "triggered": false,
+                "categories": []
+              },
+              "guard": {
+                "blocked": false,
+                "violations": []
+              },
+              "flags": []
+            },
+            "errors": []
+          }
+        },
+        {
+          "user": "Reserva el primer horario",
+          "httpStatus": 200,
+          "response": {
+            "traceId": "trc_0bb99e3c-664e-45fb-b49f-49e0c9e94039",
+            "sessionId": "cmvsmm23n0012ezy5t5irip7p",
+            "assistant": {
+              "text": "Preparé la solicitud para el 2026-10-29 a las 08:00 en Taller Norte (demo) por $333.200. Para que el taller la registre debes pulsar «Confirmar reserva» en la tarjeta antes de que caduque.",
+              "kind": "ASSISTANT",
+              "simulated": true,
+              "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)"
+            },
+            "cards": [
+              {
+                "type": "BOOKING_INTENT",
+                "intentId": "cmvsmm25x001wezy5kxygrg6w",
+                "expiresAt": "2026-10-28T17:10:00.000Z",
+                "requiresUserConfirmation": true,
+                "summary": {
+                  "serviceCode": "ENGINE_OIL_FILTER",
+                  "workshopId": "ws-demo-t1",
+                  "workshopName": "Taller Norte (demo)",
+                  "slotRef": "slot-t1-1",
+                  "startsAt": "2026-10-29T13:00:00.000Z",
+                  "totalCop": 333200,
+                  "taxCop": 53200,
+                  "source": "MOCK"
+                },
+                "confirmationToken": "[REDACTADO 43 caracteres]"
+              }
+            ],
+            "journey": {
+              "state": "AWAITING_CONFIRMATION",
+              "allowedTools": [
+                "getVehicleProfile",
+                "getServiceHistory",
+                "getMaintenancePlan",
+                "createHumanCase"
+              ]
+            },
+            "trace": {
+              "toolCalls": [
+                {
+                  "tool": "prepareBooking",
+                  "ok": true,
+                  "errorCode": null,
+                  "source": "MOCK",
+                  "durationMs": 11,
+                  "journeyStateAtCall": "SLOT_SELECTION",
+                  "summary": "intención cmvsmm25x001wezy5kxygrg6w; expira=2026-10-28T17:10:00.000Z"
+                }
+              ],
+              "llm": {
+                "provider": "SCRIPTED",
+                "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)",
+                "iterations": 2,
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "stopReason": "end_turn"
+              },
+              "safety": {
+                "triggered": false,
+                "categories": []
+              },
+              "guard": {
+                "blocked": false,
+                "violations": []
+              },
+              "flags": []
+            },
+            "errors": []
+          }
+        },
+        {
+          "ownerClick": "POST /api/bookings/confirm",
+          "httpStatus": 200,
+          "response": {
+            "booking": {
+              "status": "CONFIRMED",
+              "bookingId": "cmvsmm26a0022ezy5463zrc4l",
+              "folio": "FOLIO-T1-DEMO-EB34EAC1",
+              "startsAt": "2026-10-29T13:00:00.000Z",
+              "workshopId": "ws-demo-t1",
+              "totalCop": 333200,
+              "source": "MOCK",
+              "duplicate": false
+            },
+            "traceId": "trc_ec2babd3-9789-4df6-8e94-a95a4fd709d3"
+          }
+        }
+      ],
+      "journeyEvents": [
+        "1. EVALUATED ACTIVATED→NEED_DETECTED (SYSTEM_JOB)",
+        "2. CONTACT_SENT NEED_DETECTED→NEED_DETECTED (SYSTEM_JOB)",
+        "3. OWNER_OPENED NEED_DETECTED→CONVERSATION_OPEN (OWNER)",
+        "4. EVALUATED CONVERSATION_OPEN→CONVERSATION_OPEN (SYSTEM_AGENT)",
+        "5. RECOMMENDATION_SHOWN CONVERSATION_OPEN→RECOMMENDATION_PRESENTED (SYSTEM_AGENT)",
+        "6. QUOTE_ISSUED RECOMMENDATION_PRESENTED→QUOTE_PRESENTED (SYSTEM_AGENT)",
+        "7. SLOTS_LISTED QUOTE_PRESENTED→SLOT_SELECTION (SYSTEM_AGENT)",
+        "8. BOOKING_INTENT_CREATED SLOT_SELECTION→AWAITING_CONFIRMATION (SYSTEM_AGENT)",
+        "9. BOOKING_CONFIRMED AWAITING_CONFIRMATION→BOOKED (OWNER)"
+      ]
+    },
+    {
+      "title": "B) Historial insuficiente → UNKNOWN → caso humano",
+      "actorId": "act-owner-c2",
+      "vehicleId": "veh-demo-v2",
+      "serviceCode": "TIMING_BELT",
+      "turns": [
+        {
+          "user": "¿Debo cambiar la correa de distribución?",
+          "httpStatus": 200,
+          "response": {
+            "traceId": "trc_90a1eb12-fbd9-4090-a3a6-eb54614974ca",
+            "sessionId": "cmvsmm26t0029ezy54irh1sf2",
+            "assistant": {
+              "text": "No tengo información suficiente para determinar si corresponde el cambio de correa de distribución (INSUFFICIENT_HISTORY). No puedo recomendar el cambio ni confirmar su estado sin una revisión. Abrí un caso para que un asesor lo revise y te contacte (referencia cmvsmm27a002jezy5azy5vgv5).",
+              "kind": "ASSISTANT",
+              "simulated": true,
+              "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)"
+            },
+            "cards": [
+              {
+                "type": "EVALUATION",
+                "evaluationId": "cmvsmm273002eezy54tmi5u9g",
+                "serviceCode": "TIMING_BELT",
+                "status": "UNKNOWN",
+                "technicalStatus": "UNKNOWN",
+                "dueBy": null,
+                "remaining": null,
+                "reasons": [
+                  "INSUFFICIENT_HISTORY"
+                ],
+                "suggestedAction": "HUMAN_REVIEW",
+                "requiresOdometerConfirmation": false,
+                "plan": {
+                  "version": "demo-2026.10-r1",
+                  "sourceRef": "SYNTHETIC-DEMO: plan ficticio basado en el ejemplo sintético del PRD §7"
+                },
+                "syntheticData": true
+              },
+              {
+                "type": "HUMAN_CASE",
+                "caseId": "cmvsmm27a002jezy5azy5vgv5",
+                "reason": "INSUFFICIENT_HISTORY",
+                "priority": "NORMAL",
+                "slaDueAt": "2026-10-29T01:00:00.000Z"
+              }
+            ],
+            "journey": {
+              "state": "HUMAN_REVIEW",
+              "allowedTools": [
+                "getVehicleProfile",
+                "getServiceHistory",
+                "getMaintenancePlan",
+                "createHumanCase"
+              ]
+            },
+            "trace": {
+              "toolCalls": [
+                {
+                  "tool": "evaluateMaintenance",
+                  "ok": true,
+                  "errorCode": null,
+                  "source": "INTERNAL",
+                  "durationMs": 8,
+                  "journeyStateAtCall": "CONVERSATION_OPEN",
+                  "summary": "status=UNKNOWN; plan=demo-2026.10-r1; motor=1.0.0"
+                },
+                {
+                  "tool": "createHumanCase",
+                  "ok": true,
+                  "errorCode": null,
+                  "source": "INTERNAL",
+                  "durationMs": 9,
+                  "journeyStateAtCall": "CONVERSATION_OPEN",
+                  "summary": "caso cmvsmm27a002jezy5azy5vgv5; motivo=INSUFFICIENT_HISTORY; prioridad=NORMAL"
+                }
+              ],
+              "llm": {
+                "provider": "SCRIPTED",
+                "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)",
+                "iterations": 3,
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "stopReason": "end_turn"
+              },
+              "safety": {
+                "triggered": false,
+                "categories": []
+              },
+              "guard": {
+                "blocked": false,
+                "violations": []
+              },
+              "flags": []
+            },
+            "errors": []
+          }
+        }
+      ],
+      "journeyEvents": [
+        "1. EVALUATED ACTIVATED→ACTIVATED (SYSTEM_JOB)",
+        "2. OWNER_OPENED ACTIVATED→CONVERSATION_OPEN (OWNER)",
+        "3. EVALUATED CONVERSATION_OPEN→CONVERSATION_OPEN (SYSTEM_AGENT)",
+        "4. HUMAN_CASE_OPENED CONVERSATION_OPEN→HUMAN_REVIEW (SYSTEM_AGENT)"
+      ]
+    },
+    {
+      "title": "C) Síntoma de seguridad → SAFETY_ESCALATED → bloqueo comercial",
+      "actorId": "act-owner-c3",
+      "vehicleId": "veh-demo-v3",
+      "serviceCode": "ENGINE_OIL_FILTER",
+      "turns": [
+        {
+          "user": "El freno se hunde y casi no detiene el carro",
+          "httpStatus": 200,
+          "response": {
+            "traceId": "trc_69ccdb21-e773-4408-a3d3-4e185d83a1e5",
+            "sessionId": "cmvsmm27m002qezy5azph5uqz",
+            "assistant": {
+              "text": "Lo que describes puede afectar la seguridad del vehículo. Te recomendamos no conducirlo mientras persista el síntoma y, si estás en la vía, detenerte en un lugar seguro y pedir asistencia. Una persona de nuestro equipo revisará tu caso con prioridad urgente. Referencia de tu caso: cmvsmm27t002wezy5czc0u6xl. Mientras tanto no podemos continuar con cotizaciones ni reservas por este canal. [Texto de seguridad provisional pendiente de aprobación por personal técnico]",
+              "kind": "SYSTEM_NOTICE",
+              "simulated": true,
+              "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)"
+            },
+            "cards": [
+              {
+                "type": "SAFETY",
+                "caseId": "cmvsmm27t002wezy5czc0u6xl",
+                "categories": [
+                  "BRAKES"
+                ],
+                "lexiconVersion": "safety-lexicon-v1"
+              }
+            ],
+            "journey": {
+              "state": "SAFETY_ESCALATED",
+              "allowedTools": [
+                "getVehicleProfile",
+                "getServiceHistory"
+              ]
+            },
+            "trace": {
+              "toolCalls": [],
+              "llm": {
+                "provider": "SCRIPTED",
+                "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)",
+                "iterations": 0,
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "stopReason": null
+              },
+              "safety": {
+                "triggered": true,
+                "categories": [
+                  "BRAKES"
+                ]
+              },
+              "guard": {
+                "blocked": false,
+                "violations": []
+              },
+              "flags": []
+            },
+            "errors": []
+          }
+        },
+        {
+          "user": "Entonces cotízame el mantenimiento",
+          "httpStatus": 200,
+          "response": {
+            "traceId": "trc_568ca3c5-4b16-4707-9a5a-6e4c560e7280",
+            "sessionId": "cmvsmm27m002qezy5azph5uqz",
+            "assistant": {
+              "text": "Esa acción no está disponible en este momento del proceso.",
+              "kind": "ASSISTANT",
+              "simulated": true,
+              "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)"
+            },
+            "cards": [],
+            "journey": {
+              "state": "SAFETY_ESCALATED",
+              "allowedTools": [
+                "getVehicleProfile",
+                "getServiceHistory"
+              ]
+            },
+            "trace": {
+              "toolCalls": [
+                {
+                  "tool": "listWorkshops",
+                  "ok": false,
+                  "errorCode": "TOOL_NOT_ALLOWED_IN_STATE",
+                  "source": "INTERNAL",
+                  "durationMs": 0,
+                  "journeyStateAtCall": "SAFETY_ESCALATED",
+                  "summary": "error=TOOL_NOT_ALLOWED_IN_STATE"
+                }
+              ],
+              "llm": {
+                "provider": "SCRIPTED",
+                "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)",
+                "iterations": 2,
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "stopReason": "end_turn"
+              },
+              "safety": {
+                "triggered": false,
+                "categories": []
+              },
+              "guard": {
+                "blocked": false,
+                "violations": []
+              },
+              "flags": []
+            },
+            "errors": []
+          }
+        }
+      ],
+      "journeyEvents": [
+        "1. EVALUATED ACTIVATED→MONITORING (SYSTEM_JOB)",
+        "2. OWNER_OPENED MONITORING→CONVERSATION_OPEN (OWNER)",
+        "3. SAFETY_SIGNAL CONVERSATION_OPEN→SAFETY_ESCALATED (OWNER)"
+      ]
+    },
+    {
+      "title": "D) Conflicto de cupo → recuperación sin duplicar reserva",
+      "actorId": "act-owner-c2",
+      "vehicleId": "veh-demo-v2",
+      "serviceCode": "ENGINE_OIL_FILTER",
+      "turns": [
+        {
+          "user": "¿Qué mantenimiento le toca a mi carro?",
+          "httpStatus": 200,
+          "response": {
+            "traceId": "trc_21b46422-8e0b-4cd9-99c9-803c7a6b9835",
+            "sessionId": "cmvsmm2860034ezy5z46y7eg8",
+            "assistant": {
+              "text": "Según el plan demo-2026.10-r1 (regla de demostración sintética), el cambio de aceite y filtro ya corresponde por kilometraje (límite: 95.000 km). ¿Quieres que te consulte una cotización?",
+              "kind": "ASSISTANT",
+              "simulated": true,
+              "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)"
+            },
+            "cards": [
+              {
+                "type": "EVALUATION",
+                "evaluationId": "cmvsmm28f0039ezy5d52haz7f",
+                "serviceCode": "ENGINE_OIL_FILTER",
+                "status": "DUE",
+                "technicalStatus": "DUE",
+                "dueBy": {
+                  "km": 95000,
+                  "date": "2027-02-15"
+                },
+                "remaining": {
+                  "km": 0,
+                  "days": 110
+                },
+                "reasons": [
+                  "KM_LIMIT_REACHED"
+                ],
+                "suggestedAction": "OFFER_QUOTE",
+                "requiresOdometerConfirmation": false,
+                "plan": {
+                  "version": "demo-2026.10-r1",
+                  "sourceRef": "SYNTHETIC-DEMO: plan ficticio basado en el ejemplo sintético del PRD §7"
+                },
+                "syntheticData": true
+              }
+            ],
+            "journey": {
+              "state": "RECOMMENDATION_PRESENTED",
+              "allowedTools": [
+                "getVehicleProfile",
+                "getServiceHistory",
+                "getMaintenancePlan",
+                "recordOdometer",
+                "evaluateMaintenance",
+                "createHumanCase",
+                "listWorkshops",
+                "getQuote"
+              ]
+            },
+            "trace": {
+              "toolCalls": [
+                {
+                  "tool": "evaluateMaintenance",
+                  "ok": true,
+                  "errorCode": null,
+                  "source": "INTERNAL",
+                  "durationMs": 7,
+                  "journeyStateAtCall": "CONVERSATION_OPEN",
+                  "summary": "status=DUE; plan=demo-2026.10-r1; motor=1.0.0"
+                }
+              ],
+              "llm": {
+                "provider": "SCRIPTED",
+                "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)",
+                "iterations": 2,
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "stopReason": "end_turn"
+              },
+              "safety": {
+                "triggered": false,
+                "categories": []
+              },
+              "guard": {
+                "blocked": false,
+                "violations": []
+              },
+              "flags": []
+            },
+            "errors": []
+          }
+        },
+        {
+          "user": "¿Cuánto cuesta?",
+          "httpStatus": 200,
+          "response": {
+            "traceId": "trc_342243f2-7672-4a0b-80f0-0ad2129490d6",
+            "sessionId": "cmvsmm2860034ezy5z46y7eg8",
+            "assistant": {
+              "text": "Talleres disponibles: Taller Norte (demo), Taller Sur (demo). La cotización del taller es de $404.600 (subtotal $340.000 más impuestos de $64.600), válida hasta el 2026-10-30. Es un precio del catálogo simulado de demostración. ¿Te muestro los horarios disponibles?",
+              "kind": "ASSISTANT",
+              "simulated": true,
+              "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)"
+            },
+            "cards": [
+              {
+                "type": "WORKSHOPS",
+                "workshops": [
+                  {
+                    "workshopId": "ws-demo-t1",
+                    "name": "Taller Norte (demo)",
+                    "city": "Ciudad Demo"
+                  },
+                  {
+                    "workshopId": "ws-demo-t2",
+                    "name": "Taller Sur (demo)",
+                    "city": "Ciudad Demo"
+                  }
+                ]
+              },
+              {
+                "type": "QUOTE",
+                "quoteId": "cmvsmm28x003kezy54qemwyl1",
+                "workshopId": "ws-demo-t1",
+                "isEstimate": false,
+                "subtotalCop": 340000,
+                "taxCop": 64600,
+                "totalCop": 404600,
+                "taxLabel": "IVA 19% (valor sintético del catálogo MOCK)",
+                "includedItems": [
+                  {
+                    "qty": 1,
+                    "description": "Aceite de motor (referencia ficticia)"
+                  },
+                  {
+                    "qty": 1,
+                    "description": "Filtro de aceite (referencia ficticia)"
+                  },
+                  {
+                    "qty": 1,
+                    "description": "Mano de obra"
+                  }
+                ],
+                "restrictions": [
+                  "Precio sintético de demostración: no es una tarifa real.",
+                  "Sujeto a inspección del vehículo en el taller."
+                ],
+                "validUntil": "2026-10-30T17:00:00.000Z",
+                "catalogVersion": "SYNTHETIC-DEMO:catalogo-mock-v1",
+                "source": "MOCK"
+              }
+            ],
+            "journey": {
+              "state": "QUOTE_PRESENTED",
+              "allowedTools": [
+                "getVehicleProfile",
+                "getServiceHistory",
+                "getMaintenancePlan",
+                "recordOdometer",
+                "evaluateMaintenance",
+                "createHumanCase",
+                "listWorkshops",
+                "getQuote",
+                "getAvailableSlots"
+              ]
+            },
+            "trace": {
+              "toolCalls": [
+                {
+                  "tool": "listWorkshops",
+                  "ok": true,
+                  "errorCode": null,
+                  "source": "INTERNAL",
+                  "durationMs": 2,
+                  "journeyStateAtCall": "RECOMMENDATION_PRESENTED",
+                  "summary": "2 talleres"
+                },
+                {
+                  "tool": "getQuote",
+                  "ok": true,
+                  "errorCode": null,
+                  "source": "MOCK",
+                  "durationMs": 7,
+                  "journeyStateAtCall": "RECOMMENDATION_PRESENTED",
+                  "summary": "cotización cmvsmm28x003kezy54qemwyl1; total=404600 COP; fuente=MOCK"
+                }
+              ],
+              "llm": {
+                "provider": "SCRIPTED",
+                "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)",
+                "iterations": 3,
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "stopReason": "end_turn"
+              },
+              "safety": {
+                "triggered": false,
+                "categories": []
+              },
+              "guard": {
+                "blocked": false,
+                "violations": []
+              },
+              "flags": []
+            },
+            "errors": []
+          }
+        },
+        {
+          "user": "¿Qué horarios hay?",
+          "httpStatus": 200,
+          "response": {
+            "traceId": "trc_ddb0ee0e-adfe-4050-9e1a-4c27f64b9396",
+            "sessionId": "cmvsmm2860034ezy5z46y7eg8",
+            "assistant": {
+              "text": "Horarios disponibles: 1) 2026-10-30 a las 08:00; 2) 2026-10-31 a las 10:00; 3) 2026-11-02 a las 14:00. Dime cuál prefieres.",
+              "kind": "ASSISTANT",
+              "simulated": true,
+              "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)"
+            },
+            "cards": [
+              {
+                "type": "SLOTS",
+                "workshopId": "ws-demo-t1",
+                "source": "MOCK",
+                "slots": [
+                  {
+                    "slotRef": "slot-t1-2",
+                    "startsAt": "2026-10-30T13:00:00.000Z",
+                    "endsAt": "2026-10-30T15:00:00.000Z"
+                  },
+                  {
+                    "slotRef": "slot-t1-3",
+                    "startsAt": "2026-10-31T15:00:00.000Z",
+                    "endsAt": "2026-10-31T17:00:00.000Z"
+                  },
+                  {
+                    "slotRef": "slot-t1-4",
+                    "startsAt": "2026-11-02T19:00:00.000Z",
+                    "endsAt": "2026-11-02T21:00:00.000Z"
+                  }
+                ]
+              }
+            ],
+            "journey": {
+              "state": "SLOT_SELECTION",
+              "allowedTools": [
+                "getVehicleProfile",
+                "getServiceHistory",
+                "getMaintenancePlan",
+                "listWorkshops",
+                "getQuote",
+                "getAvailableSlots",
+                "prepareBooking",
+                "createHumanCase"
+              ]
+            },
+            "trace": {
+              "toolCalls": [
+                {
+                  "tool": "getAvailableSlots",
+                  "ok": true,
+                  "errorCode": null,
+                  "source": "MOCK",
+                  "durationMs": 5,
+                  "journeyStateAtCall": "QUOTE_PRESENTED",
+                  "summary": "3 horarios; fuente=MOCK"
+                }
+              ],
+              "llm": {
+                "provider": "SCRIPTED",
+                "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)",
+                "iterations": 2,
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "stopReason": "end_turn"
+              },
+              "safety": {
+                "triggered": false,
+                "categories": []
+              },
+              "guard": {
+                "blocked": false,
+                "violations": []
+              },
+              "flags": []
+            },
+            "errors": []
+          }
+        },
+        {
+          "user": "Reserva el primer horario",
+          "httpStatus": 200,
+          "response": {
+            "traceId": "trc_690dd042-f4b5-48c8-829d-dcc70d6c90e0",
+            "sessionId": "cmvsmm2860034ezy5z46y7eg8",
+            "assistant": {
+              "text": "Preparé la solicitud para el 2026-10-30 a las 08:00 en Taller Norte (demo) por $404.600. Para que el taller la registre debes pulsar «Confirmar reserva» en la tarjeta antes de que caduque.",
+              "kind": "ASSISTANT",
+              "simulated": true,
+              "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)"
+            },
+            "cards": [
+              {
+                "type": "BOOKING_INTENT",
+                "intentId": "cmvsmm29n003yezy5ilj76c4t",
+                "expiresAt": "2026-10-28T17:10:00.000Z",
+                "requiresUserConfirmation": true,
+                "summary": {
+                  "serviceCode": "ENGINE_OIL_FILTER",
+                  "workshopId": "ws-demo-t1",
+                  "workshopName": "Taller Norte (demo)",
+                  "slotRef": "slot-t1-2",
+                  "startsAt": "2026-10-30T13:00:00.000Z",
+                  "totalCop": 404600,
+                  "taxCop": 64600,
+                  "source": "MOCK"
+                },
+                "confirmationToken": "[REDACTADO 43 caracteres]"
+              }
+            ],
+            "journey": {
+              "state": "AWAITING_CONFIRMATION",
+              "allowedTools": [
+                "getVehicleProfile",
+                "getServiceHistory",
+                "getMaintenancePlan",
+                "createHumanCase"
+              ]
+            },
+            "trace": {
+              "toolCalls": [
+                {
+                  "tool": "prepareBooking",
+                  "ok": true,
+                  "errorCode": null,
+                  "source": "MOCK",
+                  "durationMs": 8,
+                  "journeyStateAtCall": "SLOT_SELECTION",
+                  "summary": "intención cmvsmm29n003yezy5ilj76c4t; expira=2026-10-28T17:10:00.000Z"
+                }
+              ],
+              "llm": {
+                "provider": "SCRIPTED",
+                "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)",
+                "iterations": 2,
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "stopReason": "end_turn"
+              },
+              "safety": {
+                "triggered": false,
+                "categories": []
+              },
+              "guard": {
+                "blocked": false,
+                "violations": []
+              },
+              "flags": []
+            },
+            "errors": []
+          }
+        },
+        {
+          "mockScenario": "SLOT_CONFLICT_ON_NEXT_BOOKING"
+        },
+        {
+          "ownerClick": "POST /api/bookings/confirm",
+          "httpStatus": 409,
+          "response": {
+            "error": {
+              "code": "SLOT_CONFLICT",
+              "retryable": false,
+              "refs": {
+                "bookingId": "cmvsmm29y0045ezy5ul31hf9m"
+              }
+            },
+            "traceId": "trc_6563749c-9522-4af3-a67e-71d4e10f7439"
+          }
+        },
+        {
+          "user": "¿Qué otros horarios hay?",
+          "httpStatus": 200,
+          "response": {
+            "traceId": "trc_4e7470a7-3ec8-43d5-809d-b0051a30fda4",
+            "sessionId": "cmvsmm2860034ezy5z46y7eg8",
+            "assistant": {
+              "text": "Horarios disponibles: 1) 2026-10-30 a las 08:00; 2) 2026-10-31 a las 10:00; 3) 2026-11-02 a las 14:00. Dime cuál prefieres.",
+              "kind": "ASSISTANT",
+              "simulated": true,
+              "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)"
+            },
+            "cards": [
+              {
+                "type": "SLOTS",
+                "workshopId": "ws-demo-t1",
+                "source": "MOCK",
+                "slots": [
+                  {
+                    "slotRef": "slot-t1-2",
+                    "startsAt": "2026-10-30T13:00:00.000Z",
+                    "endsAt": "2026-10-30T15:00:00.000Z"
+                  },
+                  {
+                    "slotRef": "slot-t1-3",
+                    "startsAt": "2026-10-31T15:00:00.000Z",
+                    "endsAt": "2026-10-31T17:00:00.000Z"
+                  },
+                  {
+                    "slotRef": "slot-t1-4",
+                    "startsAt": "2026-11-02T19:00:00.000Z",
+                    "endsAt": "2026-11-02T21:00:00.000Z"
+                  }
+                ]
+              }
+            ],
+            "journey": {
+              "state": "SLOT_SELECTION",
+              "allowedTools": [
+                "getVehicleProfile",
+                "getServiceHistory",
+                "getMaintenancePlan",
+                "listWorkshops",
+                "getQuote",
+                "getAvailableSlots",
+                "prepareBooking",
+                "createHumanCase"
+              ]
+            },
+            "trace": {
+              "toolCalls": [
+                {
+                  "tool": "getAvailableSlots",
+                  "ok": true,
+                  "errorCode": null,
+                  "source": "MOCK",
+                  "durationMs": 5,
+                  "journeyStateAtCall": "SLOT_SELECTION",
+                  "summary": "3 horarios; fuente=MOCK"
+                }
+              ],
+              "llm": {
+                "provider": "SCRIPTED",
+                "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)",
+                "iterations": 2,
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "stopReason": "end_turn"
+              },
+              "safety": {
+                "triggered": false,
+                "categories": []
+              },
+              "guard": {
+                "blocked": false,
+                "violations": []
+              },
+              "flags": []
+            },
+            "errors": []
+          }
+        },
+        {
+          "user": "Reserva el segundo horario",
+          "httpStatus": 200,
+          "response": {
+            "traceId": "trc_48df43b9-31b3-489f-8d17-421e4784fb0d",
+            "sessionId": "cmvsmm2860034ezy5z46y7eg8",
+            "assistant": {
+              "text": "Preparé la solicitud para el 2026-10-31 a las 10:00 en Taller Norte (demo) por $404.600. Para que el taller la registre debes pulsar «Confirmar reserva» en la tarjeta antes de que caduque.",
+              "kind": "ASSISTANT",
+              "simulated": true,
+              "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)"
+            },
+            "cards": [
+              {
+                "type": "BOOKING_INTENT",
+                "intentId": "cmvsmm2ao004iezy5te1qchx4",
+                "expiresAt": "2026-10-28T17:10:00.000Z",
+                "requiresUserConfirmation": true,
+                "summary": {
+                  "serviceCode": "ENGINE_OIL_FILTER",
+                  "workshopId": "ws-demo-t1",
+                  "workshopName": "Taller Norte (demo)",
+                  "slotRef": "slot-t1-3",
+                  "startsAt": "2026-10-31T15:00:00.000Z",
+                  "totalCop": 404600,
+                  "taxCop": 64600,
+                  "source": "MOCK"
+                },
+                "confirmationToken": "[REDACTADO 43 caracteres]"
+              }
+            ],
+            "journey": {
+              "state": "AWAITING_CONFIRMATION",
+              "allowedTools": [
+                "getVehicleProfile",
+                "getServiceHistory",
+                "getMaintenancePlan",
+                "createHumanCase"
+              ]
+            },
+            "trace": {
+              "toolCalls": [
+                {
+                  "tool": "prepareBooking",
+                  "ok": true,
+                  "errorCode": null,
+                  "source": "MOCK",
+                  "durationMs": 6,
+                  "journeyStateAtCall": "SLOT_SELECTION",
+                  "summary": "intención cmvsmm2ao004iezy5te1qchx4; expira=2026-10-28T17:10:00.000Z"
+                }
+              ],
+              "llm": {
+                "provider": "SCRIPTED",
+                "model": "scripted-llm-v1 (simulación determinista, no es IA generativa)",
+                "iterations": 2,
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "stopReason": "end_turn"
+              },
+              "safety": {
+                "triggered": false,
+                "categories": []
+              },
+              "guard": {
+                "blocked": false,
+                "violations": []
+              },
+              "flags": []
+            },
+            "errors": []
+          }
+        },
+        {
+          "ownerClick": "POST /api/bookings/confirm",
+          "httpStatus": 200,
+          "response": {
+            "booking": {
+              "status": "CONFIRMED",
+              "bookingId": "cmvsmm2ax004oezy5yedganw1",
+              "folio": "FOLIO-T1-DEMO-935CC035",
+              "startsAt": "2026-10-31T15:00:00.000Z",
+              "workshopId": "ws-demo-t1",
+              "totalCop": 404600,
+              "source": "MOCK",
+              "duplicate": false
+            },
+            "traceId": "trc_74cc706e-c89c-4bae-8ad9-9053b90e5746"
+          }
+        }
+      ],
+      "journeyEvents": [
+        "1. EVALUATED ACTIVATED→NEED_DETECTED (SYSTEM_JOB)",
+        "2. CONTACT_SUPPRESSED NEED_DETECTED→CONTACT_SUPPRESSED (SYSTEM_JOB)",
+        "3. OWNER_OPENED CONTACT_SUPPRESSED→CONVERSATION_OPEN (OWNER)",
+        "4. EVALUATED CONVERSATION_OPEN→CONVERSATION_OPEN (SYSTEM_AGENT)",
+        "5. RECOMMENDATION_SHOWN CONVERSATION_OPEN→RECOMMENDATION_PRESENTED (SYSTEM_AGENT)",
+        "6. QUOTE_ISSUED RECOMMENDATION_PRESENTED→QUOTE_PRESENTED (SYSTEM_AGENT)",
+        "7. SLOTS_LISTED QUOTE_PRESENTED→SLOT_SELECTION (SYSTEM_AGENT)",
+        "8. BOOKING_INTENT_CREATED SLOT_SELECTION→AWAITING_CONFIRMATION (SYSTEM_AGENT)",
+        "9. BOOKING_FAILED AWAITING_CONFIRMATION→SLOT_SELECTION (OWNER)",
+        "10. SLOTS_LISTED SLOT_SELECTION→SLOT_SELECTION (SYSTEM_AGENT)",
+        "11. BOOKING_INTENT_CREATED SLOT_SELECTION→AWAITING_CONFIRMATION (SYSTEM_AGENT)",
+        "12. BOOKING_CONFIRMED AWAITING_CONFIRMATION→BOOKED (OWNER)"
+      ]
+    },
+    {
+      "title": "D) Verificación de duplicados",
+      "bookingsV2": [
+        {
+          "status": "FAILED",
+          "failureCode": "SLOT_CONFLICT",
+          "externalBookingRef": null
+        },
+        {
+          "status": "CONFIRMED",
+          "failureCode": null,
+          "externalBookingRef": "FOLIO-T1-DEMO-935CC035"
+        }
+      ],
+      "mockWorkshopBookingsV2": 1
+    }
+  ]
+}

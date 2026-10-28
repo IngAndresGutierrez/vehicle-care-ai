@@ -69,3 +69,20 @@ export function chooseReminderChannel(
   if (!firstDenial) throw new Error("chooseReminderChannel: la lista de canales está vacía");
   return { allowed: false, channel: firstDenial.channel, reason: "CONSENT_REQUIRED", detail: firstDenial.detail };
 }
+
+/**
+ * Consentimiento para tratar los mensajes del propietario con el asistente de IA (D-12, ADR-018).
+ * Se otorga en el portal; sin evidencia GRANTED vigente el asistente no procesa la conversación.
+ */
+export function decideProcessingConsent(
+  consents: readonly ConsentFacts[],
+  purpose: ConsentPurpose = "AI_ASSISTANT_PROCESSING",
+): ConsentDecision {
+  const consent = consents.find((c) => c.purpose === purpose && c.channel === "PORTAL");
+  if (!consent) return deny("NO_CONSENT_RECORD");
+  const latest = [...consent.events].sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime() || a.id.localeCompare(b.id)).at(-1);
+  if (!latest) return deny("NO_EVIDENCE");
+  if (latest.action === "REVOKED") return deny("REVOKED");
+  if (!consent.isGranted) return deny("PROJECTION_MISMATCH");
+  return { allowed: true, consentEventId: latest.id };
+}

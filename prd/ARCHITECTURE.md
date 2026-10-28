@@ -422,6 +422,7 @@ El catálogo de casos está en `IMPLEMENTATION_PLAN.md §4`.
 | [ADR-015](./adr/ADR-015-journey-fsm-idempotencia-contacto.md) | FSM declarativa pura; eventos idempotentes con bloqueo optimista; deduplicación de recordatorios por ciclo/política/ventana; outbox simplificado | XState; dedup por `inputHash` | Determinismo, auditoría y ausencia de duplicados ante reintentos y concurrencia |
 | [ADR-016](./adr/ADR-016-minimo-privilegio-personal.md) | Asesor por cartera o caso asignado; compliance solo auditoría justificada o caso asignado; resolución solo por asignación | Acceso amplio por rol | Mínimo privilegio y Ley 1581 |
 | [ADR-017](./adr/ADR-017-reservas-mock-y-seguridad.md) | Reservas con taller/CRM MOCK detrás de puertos y capa anticorrupción; token hasheado; confirmación humana en tres fases con reconciliación de resultados inciertos y compensación | Llamar al taller dentro de la transacción; confirmar ante timeout | AC06/AC09: nunca una reserva confirmada sin folio, sin duplicados y sin reintentos a ciegas |
+| [ADR-018](./adr/ADR-018-agente-gateway-orquestacion.md) | Agente detrás de `LlmPort` (Anthropic o ScriptedLlm); catálogo de herramientas estable con control por estado en el gateway; contexto como mensaje system añadido; transcripción solo de añadido; preclasificador y validador de salida | Exponer solo herramientas permitidas al modelo; regenerar respuestas bloqueadas | Prefijo estable (preserved thinking), controles en código y demo reproducible sin API key |
 
 ---
 
@@ -441,15 +442,15 @@ El catálogo de casos está en `IMPLEMENTATION_PLAN.md §4`.
 | D-08 | Persistencia de mocks | Postgres (`Mock*`) vs memoria | Postgres | Arquitectura |
 | D-09 | Cierre de taller en demo: ¿`SIMULATED` o `WORKSHOP_VERIFIED` con actor demo? | — | **Resuelta (ADR-011):** `WORKSHOP_VERIFIED` + `dataOrigin=SYNTHETIC` | Producto |
 | D-10 | CRM/DMS/agenda reales de la agencia | — | Desconocido; puertos neutrales | Cliente (PRD §14.5) |
-| D-11 | Mecanismo de sesión demo | iron-session / NextAuth Credentials / JWT | iron-session (mínimo) | Arquitectura |
+| D-11 | Mecanismo de sesión demo | iron-session / NextAuth Credentials / JWT | **Implementada (ADR-018):** cookie firmada HMAC propia, sin dependencias | Arquitectura |
 | D-12 | Finalidades de consentimiento y si el uso del asistente IA requiere finalidad propia | — | Finalidad separada `AI_ASSISTANT_PROCESSING` | Jurídico (Ley 1581) |
 | D-13 | Datos que se envían al LLM y transferencia internacional de datos | — | Minimización + pseudónimos; revisar transferencia internacional | Jurídico/seguridad |
 | D-14 | Dependencias auxiliares: `fast-check`, `dependency-cruiser` | Incluir / no | **Implementada (ADR-013):** `fast-check`; fronteras con ESLint `no-restricted-imports` + test, sin `dependency-cruiser` | Arquitectura |
 | D-15 | Postgres para tests | Docker Compose local vs Testcontainers vs Neon branch | **Implementada (ADR-013):** Docker Compose (puerto 54329) + BD `vehicle_care_test` | Arquitectura |
 | D-16 | Evals con LLM real en CI | Siempre / manual / nightly | Manual + antes de demo | Arquitectura |
 | D-17 | Playwright para AC13 (UI móvil/accesibilidad) | Incluir / revisión manual | Incluir 1 smoke + axe si hay tiempo | Arquitectura |
-| D-18 | Modelo LLM | `claude-sonnet-5-5` vs `claude-haiku-5-5` vs `claude-opus-5-5` | Sonnet 5.5 por equilibrio latencia/calidad en tool use; configurable por env | Arquitectura/coste |
-| D-19 | Streaming de respuestas | Sí / No | No en MVP (traza completa por turno); P1 | Arquitectura |
+| D-18 | Modelo LLM | `claude-sonnet-5-5` vs `claude-haiku-5-5` vs `claude-opus-5-5` | **Implementada (ADR-018):** `claude-opus-5-5` por defecto, configurable (`LLM_MODEL`, `LLM_EFFORT`); `ScriptedLlm` sin API key | Arquitectura/coste |
+| D-19 | Streaming de respuestas | Sí / No | **Implementada (ADR-018):** sin streaming en el MVP | Arquitectura |
 | D-20 | Selección de taller | Usuario elige / taller por defecto según ubicación | Usuario elige entre 2 talleres seed | Producto |
 | D-21 | Cancelación/reprogramación por el agente | P0 / P1 | P1 (en MVP vía asesor) | Producto |
 | D-22 | Hosting y región de datos | Vercel + Postgres gestionado (región) | Definir región; impacta D-13 | Cliente/jurídico |
@@ -462,6 +463,8 @@ El catálogo de casos está en `IMPLEMENTATION_PLAN.md §4`.
 | D-36 | Intentos de reconciliación antes de escalar | — | **Provisional (ADR-017):** 3 intentos → caso `BOOKING_FAILURE` HIGH | Operación |
 | D-37 | Gracia antes de dar por fallida una reserva «no encontrada» en un taller real | Ventana / webhook | Pendiente para integración real (el MOCK es síncrono) | Arquitectura + proveedor |
 | D-38 | Tarifas reales y vigencia de cotización | — | Pendiente: el catálogo MOCK es sintético (48 h de vigencia) | Cliente (PRD §14.8) |
+| D-39 | Almacén del limitador de tasa | Memoria / Redis / Postgres | Memoria (una instancia); P1: compartido | Arquitectura |
+| D-40 | Reclamar el turno al inicio para evitar efectos de turnos concurrentes perdedores | — | Pendiente (P1); hoy el perdedor recibe 409 | Arquitectura |
 
 ### 12.2 Supuestos
 

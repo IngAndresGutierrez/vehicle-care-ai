@@ -19,6 +19,8 @@
 
 ---
 
+> **Implementado en Fase 5** (ADR-018): `src/agent/` — `maintenance-advisor.ts` (bucle), `gateway.ts`, `tools/definitions.ts`, `llm/{anthropic-llm,scripted-llm}.ts`, `safety/`, `output-guard.ts`, `cards.ts`, `memory.ts`, `prompts/advisor-v1.ts`. Diferencias con este borrador: el modelo recibe siempre el catálogo completo y el gateway rechaza lo no permitido por estado; el contexto va en un mensaje `role: "system"` añadido; las herramientas no reciben `serviceCode` (lo fija la sesión); no se regenera tras un bloqueo del validador (D-27 = 0). Contratos para la UI: `prd/PHASE6_HANDOFF.md`.
+
 ## 2. Bucle de orquestación
 
 ```
@@ -386,10 +388,10 @@ Umbral para demo: **0 fallos** en EV-01, 04, 07, 10, 11, 16, 18, 20, 22, 23 (cr�
 
 | ID | Decisión | Recomendación provisional |
 |---|---|---|
-| D-18 | Modelo y temperatura | `claude-sonnet-5-5`, temperatura 0.2, configurable |
+| D-18 | Modelo y temperatura | **Implementada (ADR-018):** `claude-opus-5-5`, esfuerzo `medium`, sin `temperature` (la API la rechaza); configurable |
 | D-23 | Vigencia del `BookingIntent` | 10 min (o hasta `validUntil` de la cotización, lo menor) |
 | D-24 | Lexicon de seguridad y su validación | Borrador técnico + validación por jefe de taller; tests de recall |
 | D-25 | Texto y número de asistencia en plantilla de seguridad | Pendiente de la agencia; demo con marcador «[número de asistencia]» |
 | D-26 | ¿Detección de seguridad con un clasificador LLM adicional? | No en MVP (lexicon + LLM tool); medir recall en evals |
-| D-27 | Regeneración tras bloqueo del output guard | 1 reintento; después respuesta de respaldo determinista |
+| D-27 | Regeneración tras bloqueo del output guard | **Implementada (ADR-018):** sin regeneración; respaldo determinista |
 | D-28 | Ventana de contexto conversacional | Últimos 10 turnos + memoria estructurada |

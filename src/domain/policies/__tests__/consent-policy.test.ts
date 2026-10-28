@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseReminderChannel, decideOutboundContact, type ConsentFacts } from "../consent-policy";
+import { chooseReminderChannel, decideOutboundContact, decideProcessingConsent, type ConsentFacts } from "../consent-policy";
 
 const t = (iso: string) => new Date(iso);
 const granted = (channel: ConsentFacts["channel"], id = `ev-${channel}`): ConsentFacts => ({
@@ -85,5 +85,18 @@ describe("consent-policy (denegación por defecto)", () => {
       detail: "NO_CONSENT_RECORD",
     });
     expect(() => chooseReminderChannel([], [])).toThrow();
+  });
+});
+
+describe("decideProcessingConsent (asistente IA)", () => {
+  const ai = (events: ConsentFacts["events"], isGranted = true): ConsentFacts => ({ purpose: "AI_ASSISTANT_PROCESSING", channel: "PORTAL", isGranted, events });
+  it("exige evidencia GRANTED vigente en el portal", () => {
+    expect(decideProcessingConsent([ai([{ id: "e1", action: "GRANTED", occurredAt: t("2026-09-01T00:00:00Z") }])])).toEqual({ allowed: true, consentEventId: "e1" });
+    expect(decideProcessingConsent([])).toMatchObject({ allowed: false, detail: "NO_CONSENT_RECORD" });
+    expect(decideProcessingConsent([ai([])])).toMatchObject({ detail: "NO_EVIDENCE" });
+    expect(decideProcessingConsent([ai([{ id: "e1", action: "GRANTED", occurredAt: t("2026-09-01T00:00:00Z") }, { id: "e2", action: "REVOKED", occurredAt: t("2026-09-02T00:00:00Z") }], false)])).toMatchObject({ detail: "REVOKED" });
+    expect(decideProcessingConsent([ai([{ id: "e1", action: "GRANTED", occurredAt: t("2026-09-01T00:00:00Z") }], false)])).toMatchObject({ detail: "PROJECTION_MISMATCH" });
+    // Otra finalidad no sirve.
+    expect(decideProcessingConsent([{ ...granted("PORTAL"), purpose: "MAINTENANCE_REMINDERS" }])).toMatchObject({ allowed: false });
   });
 });

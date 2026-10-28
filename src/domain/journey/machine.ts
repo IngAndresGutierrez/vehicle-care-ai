@@ -142,7 +142,8 @@ export const RULES: readonly AnyRule[] = [
   rule({ id: "contact-suppressed", event: "CONTACT_SUPPRESSED", from: ["NEED_DETECTED", "CONTACT_SUPPRESSED"], to: "CONTACT_SUPPRESSED" }),
 
   // ── Conversación y recomendación ──
-  rule({ id: "owner-opened", event: "OWNER_OPENED", from: ["NEED_DETECTED", "CONTACT_SUPPRESSED", "MONITORING"], to: "CONVERSATION_OPEN" }),
+  // ACTIVATED: el propietario puede consultar un servicio aún sin necesidad detectada (p. ej. EX-01, ADR-018).
+  rule({ id: "owner-opened", event: "OWNER_OPENED", from: ["ACTIVATED", "NEED_DETECTED", "CONTACT_SUPPRESSED", "MONITORING"], to: "CONVERSATION_OPEN" }),
   rule({ id: "owner-reopened", event: "OWNER_OPENED", from: ["CONVERSATION_OPEN"], to: "SAME" }),
   rule({ id: "odometer-recorded", event: "ODOMETER_RECORDED", from: ["CONVERSATION_OPEN", "AWAITING_CONTEXT"], to: "SAME" }),
   rule({

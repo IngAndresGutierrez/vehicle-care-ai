@@ -716,6 +716,12 @@ model ConversationSession {
   vehicle       Vehicle               @relation(fields: [vehicleId], references: [id])
   actorId       String
   memory        Json // memoria estructurada (AGENT_DESIGN §7)
+  /// Transcripción para el LLM, solo de añadido (preserved thinking, ADR-018). Sin PII ni tokens de confirmación.
+  transcript    Json                  @default("[]")
+  customerId    String? // titular por cuenta del cual actúa el agente
+  serviceCode   String                @default("ENGINE_OIL_FILTER")
+  turnCount     Int                   @default(0)
+  status        String                @default("ACTIVE") // ACTIVE | CLOSED
   promptVersion String
   model         String
   startedAt     DateTime              @default(now())
@@ -950,7 +956,10 @@ Prisma no expresa todo; se añaden en una migración SQL manual (`prisma migrate
 | `Booking` `PENDING`/`CONFIRMED` ⇒ confirmador humano registrado con rol `OWNER` o `ADVISOR` | `CHECK … NOT VALID` (ADR-017) |
 | `MockQuote.totalCop = subtotal + impuesto`; estados válidos en `MockBooking`/`MockWorkOrder` | `CHECK` |
 
-**Migraciones:** `prisma/migrations/` — `baseline` → `phase2_data_model` (tablas generadas por Prisma) → `phase2_invariants` → `phase2_rule_timing_scope` → `phase2_append_only_errcode` → `phase2_null_safe_checks` → `phase3_journey_contact_scope` → `phase3_case_journey_link` → `phase4_booking_mocks`. Se verifican desde una base vacía con `pnpm db:verify-migrations`.
+| `ConversationSession.transcript` solo crece (la versión anterior es prefijo exacto); `turnCount ≥ 0`; estado `ACTIVE`/`CLOSED` | Trigger `vc_transcript_append_only` + `CHECK` (ADR-018) |
+| `ConversationMessage` inmutable | Trigger append-only (ADR-018) |
+
+**Migraciones:** `prisma/migrations/` — `baseline` → `phase2_data_model` (tablas generadas por Prisma) → `phase2_invariants` → `phase2_rule_timing_scope` → `phase2_append_only_errcode` → `phase2_null_safe_checks` → `phase3_journey_contact_scope` → `phase3_case_journey_link` → `phase4_booking_mocks` → `phase5_agent_sessions`. Se verifican desde una base vacía con `pnpm db:verify-migrations`.
 
 **Nota de SQL:** un `CHECK` que evalúa a `NULL` se considera satisfecho. Toda condición sobre columnas opcionales usa `IS NULL`/`IS NOT NULL` explícitos (corregido en `phase2_null_safe_checks`).
 

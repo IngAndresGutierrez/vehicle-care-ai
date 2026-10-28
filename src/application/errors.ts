@@ -5,6 +5,8 @@ export type AppErrorCode =
   | "EVALUATION_NOT_FOUND"
   | "POLICY_MISSING"
   | "AMBIGUOUS_PLAN"
+  | "PLAN_NOT_VERIFIED"
+  | "CONSENT_REQUIRED"
   | "INVALID_INPUT"
   | "NOT_FOUND"
   // Journey

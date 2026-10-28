@@ -672,6 +672,12 @@ model ConversationSession {
   vehicle       Vehicle               @relation(fields: [vehicleId], references: [id])
   actorId       String
   memory        Json // memoria estructurada (AGENT_DESIGN §7)
+  /// Transcripción para el LLM, solo de añadido (preserved thinking, ADR-018). Sin PII ni tokens de confirmación.
+  transcript    Json                  @default("[]")
+  customerId    String? // titular por cuenta del cual actúa el agente
+  serviceCode   String                @default("ENGINE_OIL_FILTER")
+  turnCount     Int                   @default(0)
+  status        String                @default("ACTIVE") // ACTIVE | CLOSED
   promptVersion String
   model         String
   startedAt     DateTime              @default(now())

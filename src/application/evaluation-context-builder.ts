@@ -112,7 +112,7 @@ export async function buildEvaluationContext(
   return ok({ input, policies });
 }
 
-type DbPlanVersion = {
+export type DbPlanVersion = {
   id: string;
   version: string;
   status: "DRAFT" | "VALIDATED" | "RETIRED";
@@ -132,7 +132,7 @@ type DbPlanVersion = {
   }>;
 };
 
-function selectPlanVersion(versions: DbPlanVersion[], now: Date): DbPlanVersion | null {
+export function selectPlanVersion(versions: DbPlanVersion[], now: Date): DbPlanVersion | null {
   const newestFirst = [...versions].sort(
     (a, b) =>
       (b.effectiveFrom?.getTime() ?? 0) - (a.effectiveFrom?.getTime() ?? 0) || b.createdAt.getTime() - a.createdAt.getTime(),

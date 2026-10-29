@@ -1,0 +1,49 @@
+# CI de Vehicle Care. Railway espera a que este check pase en `main` antes de desplegar (deployment trigger con
+# checkSuites). Usa una base PostgreSQL efímera del runner: nunca la de producción. Sin Anthropic real.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: vehicle_care
+          POSTGRES_PASSWORD: vehicle_care
+          POSTGRES_DB: vehicle_care_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U vehicle_care -d vehicle_care_test"
+          --health-interval 2s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL_TEST: postgresql://vehicle_care:vehicle_care@localhost:5432/vehicle_care_test?schema=public
+      LLM_PROVIDER: scripted
+      ANTHROPIC_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:integration
+      # El build no necesita secretos ni base (rutas dinámicas con connection()).
+      - run: pnpm build

@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { ScriptedLlm } from "@/agent/llm/scripted-llm";
+import type { LlmInfo, LlmRequest, LlmResponse } from "@/agent/llm/types";
 import { DEMO_NOW } from "@/domain/maintenance-engine/__fixtures__/synthetic-demo";
 import { fixedClock } from "@/infra/clock";
 import { buildContainer, type Container } from "@/infra/container";
@@ -117,5 +118,41 @@ describe("POST /api/demo/session", () => {
     expect(await res.json()).toMatchObject({ role: "OWNER", label: "Sesión simulada (demo)" });
     expect((await handleDemoSession(post("/api/demo/session", { actorId: A.ownerC1 }), container({ DEMO_MODE: "false", DEMO_SEED_PERSONAS: "true" }))).status).toBe(404);
     expect((await handleDemoSession(post("/api/demo/session", { actorId: "nadie" }), container({ DEMO_SEED_PERSONAS: "true" }))).status).toBe(404);
+  });
+});
+
+/** Se presenta como proveedor real (para contar costo) pero responde con el guion: nunca llama a Anthropic. */
+class PricedScriptedLlm extends ScriptedLlm {
+  override readonly info: LlmInfo = { provider: "ANTHROPIC", model: "claude-sonnet-5-5", simulated: false };
+  override async complete(request: LlmRequest): Promise<LlmResponse> {
+    return { ...(await super.complete(request)), usage: { inputTokens: 1_000, outputTokens: 100 } };
+  }
+}
+
+describe("POST /api/agent/turn — tope diario de gasto del LLM real", () => {
+  const priced = (budget: string): Container =>
+    buildContainer(
+      { SESSION_SECRET: SECRET, LOG_HASH_SECRET: SECRET, AGENT_TURNS_PER_MINUTE: "50", DEMO_MODE: "true", LLM_DAILY_BUDGET_USD: budget },
+      { db, clock: fixedClock(DEMO_NOW.toISOString()), llm: new PricedScriptedLlm() },
+    );
+  const turn = (c: Container) => handleAgentTurn(post("/api/agent/turn", { vehicleId: V.v1, message: "¿Qué mantenimiento le toca a mi carro?" }, cookieFor(A.ownerC1)), c);
+
+  it("con el gasto de 24 h por debajo del tope atiende; al alcanzarlo responde 429 LLM_DAILY_BUDGET", async () => {
+    const c = priced("0.001");
+    expect((await turn(c)).status).toBe(200); // gasto previo 0 < tope
+    const blocked = await turn(c);
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toMatchObject({ error: { code: "LLM_DAILY_BUDGET" } });
+  });
+
+  it("los turnos de ScriptedLlm no consumen presupuesto", async () => {
+    const scripted = buildContainer({ SESSION_SECRET: SECRET, LOG_HASH_SECRET: SECRET, AGENT_TURNS_PER_MINUTE: "50", DEMO_MODE: "true", LLM_DAILY_BUDGET_USD: "0.0000001" }, { db, clock: fixedClock(DEMO_NOW.toISOString()), llm: new ScriptedLlm() });
+    expect((await turn(scripted)).status).toBe(200);
+    expect((await turn(scripted)).status).toBe(200);
+    expect((await turn(priced("0.0000001"))).status).toBe(200);
+  });
+
+  it("un tope inválido hace fallar el arranque en lugar de desactivarse", () => {
+    expect(() => priced("cinco")).toThrow(/LLM_DAILY_BUDGET_USD/);
   });
 });

@@ -110,6 +110,8 @@ export function AdvisorChat({
             ? "Otro mensaje tomó esta conversación. Recarga la página para ver el estado actual."
           : err?.code === "TURN_IN_PROGRESS" || err?.code === "CONCURRENT_TURN"
             ? "Tu mensaje anterior todavía se está procesando. Espera la respuesta y vuelve a intentarlo."
+          : err?.code === "LLM_DAILY_BUDGET"
+            ? "El asistente con IA alcanzó su presupuesto diario de la demo. Intenta mañana."
           : err?.code === "NETWORK"
             ? "Se perdió la conexión. Revisa tu red y reintenta."
             : err?.status === 401

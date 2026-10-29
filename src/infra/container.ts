@@ -23,6 +23,8 @@ export interface Container {
   demoLimiter: RateLimiter;
   /** Tope global de corridas demo en 24 h (contado en la base: vale entre instancias serverless). */
   demoRunsPerDay: number;
+  /** Tope global de gasto ESTIMADO del LLM real en 24 h (USD, contado en la base). Al alcanzarlo, el turno responde 429. */
+  llmDailyBudgetUsd: number;
   /** Solo local: permite entrar como las personas fijas del seed (act-*). En una demo pública queda en false. */
   demoSeedPersonas: boolean;
   sessionSecret: string;
@@ -57,6 +59,9 @@ export function buildLlm(env: Env): LlmPort {
 export function buildContainer(env: Env = process.env, overrides: Partial<Pick<Container, "db" | "clock" | "llm">> = {}): Container {
   const sessionSecret = env.SESSION_SECRET ?? "";
   if (sessionSecret.length < 32) throw new Error("SESSION_SECRET debe tener al menos 32 caracteres (ver .env.example)");
+  const llmDailyBudgetUsd = Number(env.LLM_DAILY_BUDGET_USD ?? 1);
+  // Un valor inválido (NaN) desactivaría el tope en silencio: mejor fallar al arrancar.
+  if (!Number.isFinite(llmDailyBudgetUsd) || llmDailyBudgetUsd < 0) throw new Error("LLM_DAILY_BUDGET_USD debe ser un número ≥ 0");
   const db = overrides.db ?? getPrisma();
   const clock = overrides.clock ?? systemClock;
   const llm = overrides.llm ?? buildLlm(env);
@@ -82,6 +87,7 @@ export function buildContainer(env: Env = process.env, overrides: Partial<Pick<C
     confirmLimiter: new SlidingWindowRateLimiter(Number(env.BOOKING_CONFIRMS_PER_MINUTE ?? 10), 60_000),
     demoLimiter: new SlidingWindowRateLimiter(Number(env.DEMO_RUNS_PER_10_MIN ?? 12), 10 * 60_000),
     demoRunsPerDay: Number(env.DEMO_RUNS_PER_DAY ?? 500),
+    llmDailyBudgetUsd,
     demoSeedPersonas: env.DEMO_SEED_PERSONAS === "true",
     sessionSecret,
     demoMode: env.DEMO_MODE === "true",

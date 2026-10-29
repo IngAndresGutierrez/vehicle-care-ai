@@ -3,6 +3,7 @@ import { confirmBooking } from "@/application/booking/confirm-booking";
 import type { ActorContext } from "@/domain/policies/access-policy";
 import type { Container } from "../container";
 import { newTraceId } from "../ids";
+import { llmSpentLast24hUsd } from "../llm-budget";
 import { DEMO_RUNS_COOKIE, readCookie, SESSION_COOKIE, signSession, verifyDemoRuns, verifySession } from "../session";
 
 const MAX_BODY_BYTES = 8 * 1024;
@@ -54,6 +55,11 @@ export async function handleAgentTurn(request: Request, c: Container): Promise<R
   if (!body.ok) return body.response;
   const parsed = TurnBody.safeParse(body.body);
   if (!parsed.success) return problem(400, "INVALID_REQUEST", "Campos inválidos o no permitidos.", traceId);
+  // Tope global de gasto del LLM real (24 h, en la base). Con ScriptedLlm no aplica: no hay costo.
+  if (!c.llm.info.simulated && (await llmSpentLast24hUsd(c.db, c.clock.now())) >= c.llmDailyBudgetUsd) {
+    console.warn(JSON.stringify({ level: "warn", event: "llm.daily_budget_reached", budgetUsd: c.llmDailyBudgetUsd, traceId }));
+    return problem(429, "LLM_DAILY_BUDGET", "El asistente alcanzó su presupuesto diario de IA. Intenta mañana.", traceId);
+  }
 
   const result = await c.advisor.handleTurn({ owner: actor, ...parsed.data, traceId });
   if (!result.ok) return problem(result.error.status, result.error.code, result.error.message, traceId);

@@ -55,6 +55,7 @@
     "eslint-config-next": "16.4.3",
     "fast-check": "4.10.2",
     "prisma": "7.10.1",
+    "railway": "3.16.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
     "typescript": "^5",

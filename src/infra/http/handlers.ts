@@ -7,13 +7,13 @@ import { readCookie, SESSION_COOKIE, signSession, verifySession } from "../sessi
 
 const MAX_BODY_BYTES = 8 * 1024;
 
-const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
+export const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers } });
 
-const problem = (status: number, code: string, message: string, traceId: string, headers: Record<string, string> = {}) =>
+export const problem = (status: number, code: string, message: string, traceId: string, headers: Record<string, string> = {}) =>
   json(status, { error: { code, message }, traceId }, { "x-trace-id": traceId, ...headers });
 
-async function readJson(request: Request, traceId: string): Promise<{ ok: true; body: unknown } | { ok: false; response: Response }> {
+export async function readJson(request: Request, traceId: string): Promise<{ ok: true; body: unknown } | { ok: false; response: Response }> {
   if (!(request.headers.get("content-type") ?? "").includes("application/json")) return { ok: false, response: problem(415, "UNSUPPORTED_MEDIA_TYPE", "Se espera application/json.", traceId) };
   const text = await request.text();
   if (Buffer.byteLength(text, "utf8") > MAX_BODY_BYTES) return { ok: false, response: problem(413, "PAYLOAD_TOO_LARGE", "La solicitud es demasiado grande.", traceId) };
@@ -25,7 +25,7 @@ async function readJson(request: Request, traceId: string): Promise<{ ok: true; 
 }
 
 /** Resuelve el actor desde la cookie firmada; los permisos se recalculan en el servidor. */
-async function authenticate(request: Request, c: Container): Promise<ActorContext | null> {
+export async function authenticate(request: Request, c: Container): Promise<ActorContext | null> {
   const claims = verifySession(readCookie(request.headers.get("cookie"), SESSION_COOKIE), c.sessionSecret, c.clock.now());
   if (!claims) return null;
   const account = await c.db.actorAccount.findUnique({ where: { id: claims.actorId } });
@@ -99,6 +99,10 @@ export async function handleDemoSession(request: Request, c: Container): Promise
   if (!account || !account.isDemo) return problem(404, "NOT_FOUND", "Persona demo inexistente.", traceId);
   const ttlSeconds = 8 * 3600;
   const token = signSession({ actorId: account.id, exp: Math.floor(c.clock.now().getTime() / 1000) + ttlSeconds }, c.sessionSecret);
-  const cookie = `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${ttlSeconds}${process.env.NODE_ENV === "production" ? "; Secure" : ""}`;
+  const cookie = sessionCookie(token, ttlSeconds);
   return json(200, { actorId: account.id, role: account.role, displayName: account.displayName, label: "Sesión simulada (demo)" }, { "set-cookie": cookie, "x-trace-id": traceId });
+}
+
+export function sessionCookie(token: string, ttlSeconds: number): string {
+  return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${ttlSeconds}${process.env.NODE_ENV === "production" ? "; Secure" : ""}`;
 }

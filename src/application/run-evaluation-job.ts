@@ -45,11 +45,17 @@ export interface JobDeps {
  * 3. tras el commit entrega la notificación nueva al puerto (MOCK).
  * Re-ejecutarlo no duplica eventos, mensajes ni notificaciones (ADR-015).
  */
-export async function runEvaluationJob(deps: JobDeps, { actor, traceId }: { actor: ActorContext; traceId: string }): Promise<JobItem[]> {
+export async function runEvaluationJob(
+  deps: JobDeps,
+  { actor, traceId, vehicleIds }: { actor: ActorContext; traceId: string; /** Opcional: limita el job a estos vehículos. */ vehicleIds?: string[] },
+): Promise<JobItem[]> {
   const now = deps.clock.now();
   const journeyActor: JourneyActor = { actorId: actor.actorId, role: actor.role };
   const vehicles = await deps.db.vehicle.findMany({
-    where: { ownerships: { some: { validFrom: { lte: now }, OR: [{ validTo: null }, { validTo: { gt: now } }] } } },
+    where: {
+      ownerships: { some: { validFrom: { lte: now }, OR: [{ validTo: null }, { validTo: { gt: now } }] } },
+      ...(vehicleIds ? { id: { in: vehicleIds } } : {}),
+    },
     select: {
       id: true,
       spec: { select: { planLinks: { select: { plan: { select: { versions: { select: { rules: { select: { serviceCode: true } } } } } } } } } },

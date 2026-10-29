@@ -19,6 +19,8 @@ export interface Container {
   llm: LlmPort;
   turnLimiter: RateLimiter;
   confirmLimiter: RateLimiter;
+  /** Inicio de corridas demo por IP (evita abuso de la base en DEMO_MODE). */
+  demoLimiter: RateLimiter;
   sessionSecret: string;
   demoMode: boolean;
 }
@@ -65,6 +67,7 @@ export function buildContainer(env: Env = process.env, overrides: Partial<Pick<C
     llm,
     turnLimiter: new SlidingWindowRateLimiter(Number(env.AGENT_TURNS_PER_MINUTE ?? 20), 60_000),
     confirmLimiter: new SlidingWindowRateLimiter(Number(env.BOOKING_CONFIRMS_PER_MINUTE ?? 10), 60_000),
+    demoLimiter: new SlidingWindowRateLimiter(Number(env.DEMO_RUNS_PER_10_MIN ?? 12), 10 * 60_000),
     sessionSecret,
     demoMode: env.DEMO_MODE === "true",
   };

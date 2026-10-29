@@ -68,3 +68,8 @@ docker/postgres/data/
 .idea/
 .vscode/
 *.log
+
+# Playwright (Fase 6): resultados y reporte HTML se regeneran; las capturas de evidencia sí se versionan
+/test-results/
+/prd/reports/playwright/
+/playwright/.cache/

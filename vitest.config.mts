@@ -6,7 +6,6 @@ const alias = { "@": fileURLToPath(new URL("./src", import.meta.url)) };
 export default defineConfig({
   resolve: { alias },
   test: {
-    // evals aún no tiene tests (Fase 7).
     passWithNoTests: true,
     projects: [
       {
@@ -37,9 +36,15 @@ export default defineConfig({
       {
         resolve: { alias },
         test: {
+          // Evals con LLM real: se omiten sin ANTHROPIC_API_KEY (nunca reemplazan las pruebas deterministas).
           name: "evals",
           environment: "node",
           include: ["tests/evals/**/*.test.ts"],
+          globalSetup: ["tests/integration/global-setup.ts"],
+          fileParallelism: false,
+          testTimeout: 180_000,
+          hookTimeout: 120_000,
+          env: { TZ: "UTC" },
         },
       },
     ],

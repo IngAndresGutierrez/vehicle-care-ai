@@ -6,6 +6,8 @@ import { defineConfig, devices } from "@playwright/test";
  * Siempre con ScriptedLlm: estas pruebas NO prueban un LLM real.
  */
 const PORT = Number(process.env.E2E_PORT ?? 3100);
+/** Con E2E_BASE_URL las pruebas corren contra un despliegue existente (p. ej. Vercel) y no se levanta servidor local. */
+const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "tests/e2e",
@@ -16,17 +18,19 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   reporter: [["list"], ["html", { open: "never", outputFolder: "prd/reports/playwright" }]],
-  use: { baseURL: `http://localhost:${PORT}`, trace: "retain-on-failure", locale: "es-CO", timezoneId: "America/Bogota" },
+  use: { baseURL: BASE_URL, trace: "retain-on-failure", locale: "es-CO", timezoneId: "America/Bogota" },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
     // Las pruebas solo de API (@api) no dependen del viewport: basta con escritorio.
     { name: "mobile", use: { ...devices["Pixel 7"] }, grepInvert: /@api/ },
   ],
-  webServer: {
-    command: `pnpm start --port ${PORT}`,
-    url: `http://localhost:${PORT}/api/demo/config`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-    env: { DEMO_MODE: "true", LLM_PROVIDER: "scripted", DEMO_RUNS_PER_10_MIN: "500", AGENT_TURNS_PER_MINUTE: "200", BOOKING_CONFIRMS_PER_MINUTE: "100" },
-  },
+  webServer: process.env.E2E_BASE_URL
+    ? undefined
+    : {
+        command: `pnpm start --port ${PORT}`,
+        url: `http://localhost:${PORT}/api/demo/config`,
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+        env: { DEMO_MODE: "true", LLM_PROVIDER: "scripted", DEMO_RUNS_PER_10_MIN: "500", AGENT_TURNS_PER_MINUTE: "200", BOOKING_CONFIRMS_PER_MINUTE: "100" },
+      },
 });

@@ -1,12 +1,23 @@
-# Vehicle Care — Paquete de entrega (MVP)
+# Vehicle Care — Paquete de entrega final
 
 **Fecha:** 2026-10-29 · **Alcance:** primer mantenimiento postventa (Colombia). Todos los datos son **sintéticos**; taller, CRM y mensajería son **simulados (MOCK)**.
 
 > **Estado del LLM:** la demo y todas las pruebas usan `ScriptedLlm`, una **simulación determinista por reglas que no es IA generativa** y así aparece rotulada en la interfaz. El adaptador de Anthropic está implementado y revisado contra la referencia del SDK, pero **no se ha ejecutado contra la API**: no hay `ANTHROPIC_API_KEY` ni autorización de gasto. No se declara probado un LLM real.
 
+## 0. Contenido del paquete (entregables de la prueba)
+
+| Entregable solicitado | Archivo(s) | Estado |
+|---|---|---|
+| **01 Prototipo funcional** | Repositorio completo (`src/`, `prisma/`, `tests/`); README; guía de demo `prd/GUIA_DEMO.md` | Navegable en local. **Sin URL pública** (ver §8) |
+| **02 Resumen ejecutivo** (PDF ≤ 2 páginas) | `prd/Vehicle_Care_Resumen_Ejecutivo_Comite.pdf` | 2 páginas A4 (verificado con `pdfinfo`). No se modificó |
+| **03 Modelo financiero reproducible** | `prd/vehicle_care_finanzas.xlsx` | Recálculo independiente: 768 fórmulas, **0 diferencias** (`prd/AUDITORIA_CONSISTENCIA.md` §1). No se modificó |
+| **Declaración de uso de IA** | §5 de este documento (corta) y `prd/Declaracion_Uso_IA_Vehicle_Care.md` (extendida) | Consistentes con el PDF |
+| Documentación de soporte | `prd/PRD_Vehicle_Care_v1.md`, `ARCHITECTURE.md`, `DATA_MODEL.md`, `AGENT_DESIGN.md`, `prd/adr/` (ADR-009…020), `prd/reports/` | — |
+| Auditoría y despliegue | `prd/AUDITORIA_CONSISTENCIA.md`, `prd/DESPLIEGUE.md` | — |
+
 ## 1. Cómo ejecutarlo
 
-**URL pública: no publicada.** No hay credenciales de Vercel en el entorno. Los pasos de despliegue están en el README, sección «Despliegue en Vercel».
+**URL pública: no publicada.** No hay CLI ni credenciales de Vercel en el entorno. Los pasos exactos de despliegue están en `prd/DESPLIEGUE.md`.
 
 Ejecución local reproducible (requiere Node ≥ 24, pnpm y Docker):
 
@@ -16,11 +27,11 @@ pnpm db:up && pnpm db:migrate:deploy && pnpm db:seed
 pnpm build && pnpm start                  # http://localhost:3000
 ```
 
-Guía de la demo: README, sección «Demo navegable».
+Guion de 4 a 5 minutos: `prd/GUIA_DEMO.md`. Detalle de cada escenario: README, sección «Demo navegable».
 
 ## 2. Evidencia de los cuatro escenarios
 
-Prueba automatizada con Playwright sobre `next start`, en escritorio (1440×900) y móvil (Pixel 7). Registro: `prd/reports/evidence/e2e-fase7.txt` (25/25).
+Prueba automatizada con Playwright sobre `next start`, en escritorio (1440×900) y móvil (Pixel 7). Registros: `prd/reports/evidence/e2e-fase7.txt` y, en el cierre, `prd/reports/evidence/e2e-cierre.txt` (25/25 en ambos).
 
 | Escenario | Resultado verificado | Capturas (`prd/reports/screenshots/`) |
 |---|---|---|
@@ -76,14 +87,23 @@ Se usaron herramientas de IA generativa: ChatGPT para la exploración de product
 | AC13 | Usable en móvil y escritorio; accesible | ✅ | E2E en ambos viewports; axe WCAG 2.1 AA sin violaciones en 5 vistas (`prd/reports/evidence/a11y/`) |
 | AC14 | Documentar qué es mock y qué requiere producción | ✅ | Sección 4 de este documento |
 
-## 7. Inconsistencias con el modelo financiero y el resumen ejecutivo (para revisión; no se modificaron)
+## 7. Inconsistencias con el modelo financiero y el resumen ejecutivo
 
-| # | Documento | Supuesto | Prototipo | Sugerencia |
-|---|---|---|---|---|
-| 1 | Modelo financiero (`Costos!B23:B30`, `Fuentes S04`) y resumen ejecutivo | Claude **Sonnet 4.6**, USD 3/15 por MTok, 25.000/5.000 tokens por conversación → **780 COP/conversación** | Modelo por defecto **`claude-opus-5-5`**. La referencia del SDK indica USD 4/20 por MTok, lo que da un costo por token mayor | Elegir el modelo del piloto y actualizar la tarifa con la página oficial de precios. Los tokens por conversación **no están medidos**: medirlos con `EVAL_LLM=anthropic pnpm eval:agent` |
-| 2 | Modelo (`Supuestos!B18:D18`, «Ticket neto» 330k/450k/560k COP) | Ticket neto de IVA por OT | Catálogo **sintético** para el primer cambio de aceite: 280.000 neto (333.200 con IVA) | Son cifras ficticias en ambos lados. Validar el ticket real del primer mantenimiento con el taller (`Validacion` H14) |
-| 3 | Modelo («Cohortes de entregas ≤180 días») y resumen («foco primeros 180 días») | Elegibilidad por antigüedad de la entrega | El prototipo evalúa cualquier vehículo con plan validado; **no filtra por 180 días** | Definir si la regla de elegibilidad entra al MVP o queda como segmentación operativa del piloto |
-| 4 | Modelo (`Supuestos` A/B: control 22% vs tratamiento) y resumen («Piloto A/B») | Grupo de control | El prototipo no asigna grupos ni mide uplift | Es trabajo del piloto (M3), no del MVP; conviene aclararlo ante el comité |
-| 5 | Modelo («% derivaciones a humano» 20/12/8%) | Tasa de excepciones | Solo hay datos sintéticos (eval: 2/12 casos con caso humano por diseño) | Ninguna cifra del prototipo sirve para calibrar esta tasa |
-| 6 | Resumen ejecutivo, journey paso 05 «Taller: orden y registro de servicio» | Orden de trabajo y registro | Existe en el backend (casos de uso y pruebas de la Fase 4), **sin pantalla** en la demo | Presentarlo como cubierto por la API y las pruebas, no por la interfaz |
-| 7 | Modelo («Tarifa por mensaje» 45 COP, WhatsApp) | Canal WhatsApp | La mensajería es MOCK y no envía | Coherente con el alcance; mantener la etiqueta de hipótesis |
+La auditoría completa está en `prd/AUDITORIA_CONSISTENCIA.md`: 14 diferencias con severidad, evidencia, propuesta y documento afectado, más la verificación de las fórmulas y la sensibilidad. Las cifras financieras no se modificaron. En resumen:
+- **Abiertas, requieren decisión:** modelo de LLM del piloto (Sonnet 4.6 en el modelo frente a Opus 5.5 por defecto en el prototipo; impacto en el VPN base de −0,6 M COP), medición real del costo de IA (780 COP estimado), ticket real del primer mantenimiento (variable crítica: con 280.000 COP el VPN base pasa de −46,7 M a −95,5 M), desglose de la CAPEX de integraciones, regla de elegibilidad de 180 días y aprobación de la plantilla de seguridad.
+- **Resueltas en la entrega (documentación):** distinción entre MOCK y real, P0 sin pantalla, A/B e indicadores como diseño del piloto, y consistencia de la declaración de uso de IA.
+
+## 8. Estado real
+
+| Aspecto | Estado |
+|---|---|
+| **Despliegue** | **No desplegado; no hay URL.** El build es apto para Vercel: compila sin secretos ni base. Pasos exactos en `prd/DESPLIEGUE.md` |
+| **LLM** | **Solo `ScriptedLlm`** (simulación determinista, rotulada). `AnthropicLlm` implementado y revisado contra la referencia del SDK, **nunca ejecutado contra la API**. Calidad conversacional, latencia y costo reales sin medir |
+| **Pruebas** | lint, typecheck, unitarias, integración, journeys, E2E y axe, build y migraciones en verde (`prd/reports/REPORT_FASE_7.md` §5; cierre en `prd/reports/REPORT_CIERRE.md`) |
+
+## 9. Bloqueos que requieren intervención del usuario
+
+1. **Despliegue:** cuenta de Vercel (`vercel login`), elección del proveedor y plan de Postgres (gratuito o de pago) y ejecución de `prd/DESPLIEGUE.md` §2. Después, compartir la URL real.
+2. **LLM real:** `ANTHROPIC_API_KEY` y aprobación de un presupuesto (sugerido USD 5–10) para `EVAL_LLM=anthropic EVAL_BUDGET_USD=… pnpm eval:agent`.
+3. **Decisiones de consistencia:** puntos abiertos 1, 2, 3, 5, 7 y 11 de la auditoría.
+4. **Opcional:** aprobar o no la nota sugerida para el PDF (auditoría §3).

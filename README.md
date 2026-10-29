@@ -84,25 +84,13 @@ Todo lo simulado lleva un sello punteado. Con `LLM_PROVIDER=scripted` el asisten
 
 Pantallas: `/` (escenarios), `/vehiculo/[id]` (portal y asistente), `/trazas/[id]`, `/casos`. API y decisiones: ADR-019 y ADR-020.
 
-## Despliegue en Vercel (preparado, no ejecutado: no hay credenciales de Vercel en este entorno)
+## Despliegue en Vercel
 
-- **Base de datos:** PostgreSQL gestionado desde el Marketplace de Vercel (p. ej. Neon) con `DATABASE_URL`. Las migraciones **no** corren en el build. Ejecuta una vez desde tu máquina o CI: `DATABASE_URL=… pnpm db:migrate:deploy && DATABASE_URL=… pnpm db:seed`.
-- **Variables** (secretas en Vercel; nunca en el repositorio):
-  - `DATABASE_URL`;
-  - `SESSION_SECRET` y `LOG_HASH_SECRET`: ≥ 32 caracteres, aleatorios y distintos (`openssl rand -base64 48`);
-  - `DEMO_MODE=true`, solo en el entorno de demo;
-  - `LLM_PROVIDER=scripted`;
-  - `DEMO_RUNS_PER_10_MIN=12` y `DEMO_RUNS_PER_DAY=500`;
-  - `DEMO_SEED_PERSONAS=false`.
-  
-  `LLM_PROVIDER=anthropic` con `ANTHROPIC_API_KEY` solo con un presupuesto aprobado: una demo pública con LLM real expone costos.
-- **Pasos:**
-  1. Crear el proyecto (`vercel link`).
-  2. Agregar Postgres desde el Marketplace.
-  3. Cargar las variables con `vercel env add`.
-  4. Migrar y sembrar la base una vez.
-  5. Publicar con `vercel deploy --prod`.
-  6. Comprobar `GET /api/demo/config` (`demoMode: true`, `llm.simulated: true`) y recorrer A–D.
-- **Build:** `pnpm install` (incluye `prisma generate`) y `next build`. Runtime Node.js por defecto. La cookie de sesión lleva `Secure` en producción.
-- **Protección:** límite por IP (en memoria, por instancia), **tope diario global contado en la base**, sesiones firmadas HttpOnly y Secure, cabeceras de seguridad y `noindex`. No hay endpoints de seed ni reset.
-- **Limitaciones:** el limitador por IP es en memoria y vale por instancia, no global. Para producción conviene un almacén compartido (p. ej. Redis del Marketplace). Las corridas de demo agregan filas que no se borran (tablas append-only); vigila el tamaño de la base de demo.
+**No desplegado; no hay URL pública.** El build compila sin secretos ni base, así que es apto para Vercel. La auditoría de configuración y los pasos exactos (Postgres del Marketplace, variables, `migrate deploy` con la URL directa, verificación con `E2E_BASE_URL=<url> pnpm test:e2e` y reversión) están en [`prd/DESPLIEGUE.md`](./prd/DESPLIEGUE.md).
+
+## Entrega
+
+- Paquete e índice: [`prd/ENTREGA.md`](./prd/ENTREGA.md)
+- Guion de 4 a 5 minutos: [`prd/GUIA_DEMO.md`](./prd/GUIA_DEMO.md)
+- Auditoría frente al PRD, el resumen ejecutivo y el modelo financiero: [`prd/AUDITORIA_CONSISTENCIA.md`](./prd/AUDITORIA_CONSISTENCIA.md)
+- Informe de cierre: [`prd/reports/REPORT_CIERRE.md`](./prd/reports/REPORT_CIERRE.md)

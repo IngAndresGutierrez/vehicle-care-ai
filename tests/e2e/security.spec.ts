@@ -1,7 +1,7 @@
 import { expect, request as pwRequest, test } from "@playwright/test";
 import { apiRun, apiToIntent, apiTurn, say, startScenario, openAssistant } from "./helpers";
 
-const base = `http://localhost:${process.env.E2E_PORT ?? 3100}`;
+const base = process.env.E2E_BASE_URL ?? `http://localhost:${process.env.E2E_PORT ?? 3100}`;
 
 test.describe("Seguridad y errores", () => {
   test("confirmación duplicada no crea dos reservas @api", async () => {

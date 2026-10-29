@@ -8,9 +8,9 @@
 
 | Entregable solicitado | Archivo(s) | Estado |
 |---|---|---|
-| **01 Prototipo funcional** | Repositorio completo (`src/`, `prisma/`, `tests/`); README; guía de demo `prd/GUIA_DEMO.md` | Navegable en local. **Sin URL pública** (ver §8) |
-| **02 Resumen ejecutivo** (PDF ≤ 2 páginas) | `prd/Vehicle_Care_Resumen_Ejecutivo_Comite.pdf` | 2 páginas A4 (verificado con `pdfinfo`). No se modificó |
-| **03 Modelo financiero reproducible** | `prd/vehicle_care_finanzas.xlsx` | Recálculo independiente: 768 fórmulas, **0 diferencias** (`prd/AUDITORIA_CONSISTENCIA.md` §1). No se modificó |
+| **01 Prototipo funcional** | Repositorio completo (`src/`, `prisma/`, `tests/`); README; guía de presentación y guion de grabación en `prd/GUIA_DEMO.md` | Demostración local reproducible. **Sin URL pública** (ver §8) |
+| **02 Resumen ejecutivo** (PDF ≤ 2 páginas) | `prd/Vehicle_Care_Resumen_Ejecutivo_Comite.pdf` (notas rev. 29 oct 2026) | 2 páginas A4. Solo cambiaron **dos bloques de notas de la p. 2** (decisiones D1–D6); proyecciones idénticas (0 píxeles distintos fuera de las notas). Original en `prd/historico/`; script en `prd/tools/actualizar_notas_resumen.py` |
+| **03 Modelo financiero reproducible** | `prd/vehicle_care_finanzas.xlsx` | **Intacto** (sin cambios frente al repositorio). Recálculo independiente: 768 fórmulas, **0 diferencias** (`prd/AUDITORIA_CONSISTENCIA.md` §1) |
 | **Declaración de uso de IA** | §5 de este documento (corta) y `prd/Declaracion_Uso_IA_Vehicle_Care.md` (extendida) | Consistentes con el PDF |
 | Documentación de soporte | `prd/PRD_Vehicle_Care_v1.md`, `ARCHITECTURE.md`, `DATA_MODEL.md`, `AGENT_DESIGN.md`, `prd/adr/` (ADR-009…020), `prd/reports/` | — |
 | Auditoría y despliegue | `prd/AUDITORIA_CONSISTENCIA.md`, `prd/DESPLIEGUE.md` | — |
@@ -64,6 +64,17 @@ También hay evidencia por API (Fase 5) en `prd/reports/evidence/agent-journeys.
 | Identidad | **Simulada**: sesión demo firmada (HMAC) | Para producción: OTP o SSO detrás de la misma interfaz |
 | Personas, vehículos, talleres, precios, historial | **Sintéticos** (`dataOrigin=SYNTHETIC`) | No hay datos personales reales |
 
+### 4.1 Dependencias de integración para operar con clientes reales (decisión D4)
+
+El presupuesto de integración del modelo (`Costos` H34: «Integración CRM/DMS + QA», 12 M COP) se mantiene **provisionalmente sin cambios**. Estas son las dependencias que debe cubrir; el costo real de cada una es una hipótesis a validar con TI del cliente (PRD §14, decisión 5):
+
+| Dependencia | Puerto del prototipo | Qué se necesita del cliente | Riesgo si no está |
+|---|---|---|---|
+| **CRM/DMS** (clientes, vehículos, historial, órdenes) | `ports/crm.ts`; lectura de historial y órdenes vía `ports/workshop.ts` | API o exportación con historial de servicio y procedencia, titularidad vigente y consentimiento; credenciales de servicio con mínimo privilegio | Sin historial verificable, más casos UNKNOWN y derivaciones |
+| **Agenda y cotizador del taller** | `ports/workshop.ts` (catálogo, cupos, reserva idempotente, folio, reconciliación) | API de disponibilidad y reserva con idempotencia, catálogo con precios netos e IVA, códigos de servicio | Doble reserva o precios no verificables: no se puede operar |
+| **Autenticación del propietario** | Sesión firmada (hoy simulada) | OTP por canal consentido o SSO del cliente, vinculado a titularidad vigente | Riesgo de acceso indebido a datos de un vehículo |
+| **Mensajería (WhatsApp/BSP)** | `ports/notifications` (hoy MOCK, nunca envía) | BSP contratado, plantillas aprobadas por categoría y consentimiento por finalidad y canal (Ley 1581) | Sin contacto saliente autorizado; solo canal propio |
+
 ## 5. Declaración corta de uso de IA
 
 Se usaron herramientas de IA generativa: ChatGPT para la exploración de producto, la revisión de fuentes, el modelo financiero y el resumen ejecutivo, y Claude Code para la arquitectura y la implementación asistida del prototipo por fases, con pruebas automatizadas. La IA no se usó como fuente de intervalos de mantenimiento ni para certificar nada mecánicamente. Los intervalos, vehículos, precios e integraciones de la demo son sintéticos o simulados y así se rotulan. Los resultados de las pruebas provienen de comandos ejecutados y deben contrastarse con el código y la demo. Las decisiones finales son del autor. La declaración extendida está en `prd/Declaracion_Uso_IA_Vehicle_Care.md`.
@@ -87,11 +98,20 @@ Se usaron herramientas de IA generativa: ChatGPT para la exploración de product
 | AC13 | Usable en móvil y escritorio; accesible | ✅ | E2E en ambos viewports; axe WCAG 2.1 AA sin violaciones en 5 vistas (`prd/reports/evidence/a11y/`) |
 | AC14 | Documentar qué es mock y qué requiere producción | ✅ | Sección 4 de este documento |
 
-## 7. Inconsistencias con el modelo financiero y el resumen ejecutivo
+## 7. Decisiones aprobadas (2026-10-29) e inconsistencias
 
-La auditoría completa está en `prd/AUDITORIA_CONSISTENCIA.md`: 14 diferencias con severidad, evidencia, propuesta y documento afectado, más la verificación de las fórmulas y la sensibilidad. Las cifras financieras no se modificaron. En resumen:
-- **Abiertas, requieren decisión:** modelo de LLM del piloto (Sonnet 4.6 en el modelo frente a Opus 5.5 por defecto en el prototipo; impacto en el VPN base de −0,6 M COP), medición real del costo de IA (780 COP estimado), ticket real del primer mantenimiento (variable crítica: con 280.000 COP el VPN base pasa de −46,7 M a −95,5 M), desglose de la CAPEX de integraciones, regla de elegibilidad de 180 días y aprobación de la plantilla de seguridad.
-- **Resueltas en la entrega (documentación):** distinción entre MOCK y real, P0 sin pantalla, A/B e indicadores como diseño del piloto, y consistencia de la declaración de uso de IA.
+La auditoría completa está en `prd/AUDITORIA_CONSISTENCIA.md` (14 diferencias, verificación de fórmulas y sensibilidad). Decisiones del usuario, aplicadas sin modificar el Excel ni las proyecciones:
+
+| # | Decisión | Dónde se refleja |
+|---|---|---|
+| D1 | **Claude Sonnet 4.6 se mantiene como hipótesis del modelo financiero.** La demo sigue con **ScriptedLlm**, identificado como simulación. **No se afirma la validación de un LLM real.** El adaptador del prototipo es configurable (por defecto `claude-opus-5-5`; sensibilidad en el VPN base de −0,6 M COP) | Nota del PDF p. 2; §4 y §8 |
+| D2 | **780 COP por conversación es una estimación, nunca una medición** | Nota del PDF p. 2; guion de demo |
+| D3 | **Ticket base 450.000 COP sin cambios.** Sensibilidad: con 280.000 COP netos, **VPN base ≈ −95,5 M COP** (umbral ≈ 72,3 %), calculada sobre una copia del modelo | Nota del PDF p. 2; auditoría §1 |
+| D4 | **Presupuesto de integraciones provisional.** Dependencias de CRM/DMS, agenda, autenticación y mensajería documentadas | §4.1; nota del PDF p. 2 |
+| D5 | **Ventana de 180 días = criterio de segmentación del piloto**, no regla técnica del motor (el motor no cambia) | Nota del PDF p. 2 |
+| D6 | **El protocolo de seguridad requiere aprobación de un responsable técnico antes de operar con clientes reales.** Hoy la plantilla es provisional | Nota del PDF p. 2; `prd/DESPLIEGUE.md` §0; bloqueos §9 |
+
+**Resueltas en documentación:** distinción entre MOCK y real, P0 sin pantalla, A/B e indicadores como diseño del piloto, y consistencia de la declaración de uso de IA.
 
 ## 8. Estado real
 
@@ -103,7 +123,7 @@ La auditoría completa está en `prd/AUDITORIA_CONSISTENCIA.md`: 14 diferencias 
 
 ## 9. Bloqueos que requieren intervención del usuario
 
-1. **Despliegue:** cuenta de Vercel (`vercel login`), elección del proveedor y plan de Postgres (gratuito o de pago) y ejecución de `prd/DESPLIEGUE.md` §2. Después, compartir la URL real.
-2. **LLM real:** `ANTHROPIC_API_KEY` y aprobación de un presupuesto (sugerido USD 5–10) para `EVAL_LLM=anthropic EVAL_BUDGET_USD=… pnpm eval:agent`.
-3. **Decisiones de consistencia:** puntos abiertos 1, 2, 3, 5, 7 y 11 de la auditoría.
-4. **Opcional:** aprobar o no la nota sugerida para el PDF (auditoría §3).
+1. **Despliegue público:** cuenta de Vercel (`vercel login`), Postgres del Marketplace en plan gratuito y ejecución de `prd/DESPLIEGUE.md`. Mientras tanto, la demostración es local (`prd/GUIA_DEMO.md` §1) y puede grabarse con el guion de §3.
+2. **LLM real (opcional):** `ANTHROPIC_API_KEY` y aprobación de presupuesto (USD 5–10) para `EVAL_LLM=anthropic EVAL_BUDGET_USD=… pnpm eval:agent`. Hasta entonces, D1 y D2 rigen.
+3. **Antes de clientes reales (no para la evaluación):** aprobación del protocolo de seguridad por un responsable técnico (D6) y las dependencias de integración de §4.1 (D4).
+4. **Grabación del video:** la debe hacer una persona; no hay URL ni video generados.

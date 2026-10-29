@@ -1,5 +1,7 @@
 # Informe de cierre — auditoría final y entrega
 
+> **Addendum (2026-10-29, posterior a este informe).** El usuario aprobó las decisiones D1–D6 para los puntos abiertos de §2. Se aplicaron sin tocar el Excel ni las proyecciones: solo se actualizaron **dos bloques de notas de la p. 2 del PDF** (original en `prd/historico/`). Detalle y verificación en `prd/ENTREGA.md` §7, `prd/AUDITORIA_CONSISTENCIA.md` §3 y `prd/reports/REPORT_ENTREGA_FINAL.md`. Las menciones de este informe a «abiertas» y a la «nota opcional del PDF» quedan superadas.
+
 **Fecha:** 2026-10-29 · **Alcance:** cierre sin funcionalidades nuevas. Solo se hicieron dos correcciones de despliegue (§3) y documentación. Sin cambios en el Maintenance Engine, en las cifras financieras ni en el PDF. No se ejecutaron pruebas con APIs de pago.
 
 ## 1. Checklist de requisitos de la prueba técnica

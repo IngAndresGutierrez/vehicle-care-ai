@@ -91,6 +91,7 @@ Pantallas: `/` (escenarios), `/vehiculo/[id]` (portal y asistente), `/trazas/[id
 ## Entrega
 
 - Paquete e índice: [`prd/ENTREGA.md`](./prd/ENTREGA.md)
-- Guion de 4 a 5 minutos: [`prd/GUIA_DEMO.md`](./prd/GUIA_DEMO.md)
+- Demo local reproducible y guion de grabación (máx. 5 min): [`prd/GUIA_DEMO.md`](./prd/GUIA_DEMO.md)
 - Auditoría frente al PRD, el resumen ejecutivo y el modelo financiero: [`prd/AUDITORIA_CONSISTENCIA.md`](./prd/AUDITORIA_CONSISTENCIA.md)
 - Informe de cierre: [`prd/reports/REPORT_CIERRE.md`](./prd/reports/REPORT_CIERRE.md)
+- Informe de entrega final (decisiones D1–D6 y notas del resumen): [`prd/reports/REPORT_ENTREGA_FINAL.md`](./prd/reports/REPORT_ENTREGA_FINAL.md)

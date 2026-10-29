@@ -2,6 +2,14 @@
 
 **Estado real (2026-10-29): NO desplegado. No hay URL pública.** El entorno no tiene CLI de Vercel ni token (`VERCEL_TOKEN`), ni proyecto vinculado (`.vercel/`). No se crearon recursos, ni de pago ni gratuitos.
 
+## 0. Política del despliegue de demostración (decisiones del 2026-10-29)
+
+1. **Solo demostración con datos sintéticos.** No se opera con clientes reales hasta que un responsable técnico apruebe el protocolo de seguridad (D6) y existan las integraciones de `ENTREGA.md` §4.1 (D4).
+2. **`LLM_PROVIDER=scripted` es obligatorio** en el entorno público (D1). No se carga `ANTHROPIC_API_KEY` en Vercel sin un presupuesto aprobado; la interfaz rotula la simulación.
+3. **Sin recursos de pago.** Postgres del Marketplace en **plan gratuito**, sin add-ons. Cualquier recurso de pago requiere aprobación explícita del usuario.
+4. **Secretos solo en Vercel** (`vercel env`), generados al momento, nunca en el repositorio. `DEMO_SEED_PERSONAS=false` en el entorno público.
+5. **Migraciones solo aditivas** (`prisma migrate deploy`). Nada de `reset`, `db push` ni borrados.
+
 ## 1. Auditoría de configuración
 
 | Área | Estado | Evidencia o acción |

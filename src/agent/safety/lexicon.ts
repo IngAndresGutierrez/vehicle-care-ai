@@ -13,7 +13,7 @@ export type SafetyCategory =
   | "TIRES"
   | "BRAKE_FLUID_LEAK";
 
-export const SAFETY_LEXICON_VERSION = "safety-lexicon-v1";
+export const SAFETY_LEXICON_VERSION = "safety-lexicon-v1.1";
 
 /** Minúsculas, sin tildes ni signos, espacios colapsados. */
 export function normalizeText(text: string): string {
@@ -33,14 +33,16 @@ const PATTERNS: ReadonlyArray<[SafetyCategory, RegExp]> = [
   ["BRAKES", /\b(sin|perdi|perdio|me quede sin) (los )?frenos\b/],
   ["STEERING", /\b(direccion|timon|volante)\b.{0,40}(se (va|fue|bloque|trab|suelt)|bloquead|trabad|duro de repente|no responde|suelto)/],
   ["FIRE_SMOKE_FUEL", /\b(humo|fuego|llamas?|incendi\w*|se prendio el motor)\b/],
-  ["FIRE_SMOKE_FUEL", /\bolor a (gasolina|combustible|quemado)\b/],
+  ["FIRE_SMOKE_FUEL", /\b(olor|huele|oliendo) a (gasolina|combustible|quemado)\b/],
   ["FIRE_SMOKE_FUEL", /\b(fuga|gotea|bota|riega)\w*\b.{0,20}\b(gasolina|combustible|acpm|diesel)\b/],
-  ["OVERHEATING", /\btemperatura\b.{0,25}(en rojo|al maximo|muy alta|se subio|subio)/],
+  ["OVERHEATING", /\btemperatura\b.{0,25}(en rojo|al rojo|al maximo|muy alta|se subio|subio)/],
   ["OVERHEATING", /\b(recalent|sobrecalent)\w*/],
   ["OVERHEATING", /\b(bota|sale|echa) (humo blanco|vapor)\b/],
   ["CRITICAL_WARNING_LIGHT", /\b(luz|testigo|bombillo|indicador)\w*\b.{0,15}\broj[oa]s?\b/],
   ["CRITICAL_WARNING_LIGHT", /\b(luz|testigo)\b.{0,10}\b(de )?(aceite|freno|frenos|temperatura)\b.{0,15}\b(encendid|prendid|se prendio|titila)/],
   ["TIRES", /\b(llanta|neumatico|rueda)s?\b.{0,30}(revent|estall|se (salio|sale|solto)|se desinfl\w* (de golpe|rapid))/],
+  // v1.1 (Fase 8A): mismo criterio con el verbo antes del sustantivo («se me estalló una llanta»).
+  ["TIRES", /\b(revent|estall)\w*\b.{0,20}\b(llanta|neumatico|rueda)s?\b/],
   ["BRAKE_FLUID_LEAK", /\b(liquido|fluido) de frenos?\b.{0,30}(fuga|gotea|se (bota|sale|perdio|acabo))/],
   ["BRAKE_FLUID_LEAK", /\b(fuga|gotea)\w*\b.{0,20}\bliquido de frenos?\b/],
 ];

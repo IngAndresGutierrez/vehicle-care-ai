@@ -5,11 +5,13 @@ import { runJob, say } from "../integration/helpers/agent";
 import { connectTestDb, resetAndSeed } from "../integration/helpers/test-db";
 
 /**
- * Prueba con el LLM REAL de Anthropic. Solo corre si existe ANTHROPIC_API_KEY; si no, queda «skipped» y NO debe
+ * Prueba con el LLM REAL de Anthropic. Solo corre con ANTHROPIC_API_KEY **y** RUN_LIVE_LLM_EVALS=1; si no, queda «skipped» y NO debe
  * reportarse como ejecutada. Verifica invariantes que no dependen de la redacción del modelo: las decisiones
  * técnicas vienen del motor, el agente no confirma reservas y la seguridad no pasa por el LLM.
  */
-const live = !!process.env.ANTHROPIC_API_KEY;
+// Doble llave: tener la API key en .env NO basta para gastar. Se exige además RUN_LIVE_LLM_EVALS=1 (autorización
+// explícita), para que `pnpm test:evals` o una validación general nunca consuman créditos por accidente.
+const live = !!process.env.ANTHROPIC_API_KEY && process.env.RUN_LIVE_LLM_EVALS === "1";
 const db = connectTestDb();
 const { vehicles: V } = DEMO_IDS;
 async function ownerC1() {

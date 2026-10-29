@@ -97,7 +97,7 @@ describe("AnthropicLlm (adaptador real, con transporte simulado: sin red ni API 
 
     const req = captured!;
     expect(req.url).toContain("/v1/messages");
-    expect(req.body).toMatchObject({ model: "claude-opus-5-5", max_tokens: 4096, system: "SYS", tool_choice: { type: "auto" }, output_config: { effort: "low" }, fallbacks: "default" });
+    expect(req.body).toMatchObject({ model: "claude-opus-5-5", max_tokens: 4096, system: [{ type: "text", text: "SYS", cache_control: { type: "ephemeral" } }], cache_control: { type: "ephemeral" }, tool_choice: { type: "auto" }, output_config: { effort: "low" }, fallbacks: "default" });
     expect(req.headers.get("anthropic-beta")).toContain("server-side-fallback-2026-07-01");
     expect(req.body).not.toHaveProperty("temperature");
     expect(req.body).not.toHaveProperty("thinking");
@@ -105,7 +105,7 @@ describe("AnthropicLlm (adaptador real, con transporte simulado: sin red ni API 
     expect((req.body.messages as Array<{ role: string }>).map((m) => m.role)).toEqual(["user", "system"]);
 
     expect(res.stopReason).toBe("tool_use");
-    expect(res.usage).toEqual({ inputTokens: 120, outputTokens: 30 });
+    expect(res.usage).toEqual({ inputTokens: 120, outputTokens: 30, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 });
     expect(res.content[0]).toMatchObject({ type: "opaque", raw: { type: "thinking", signature: "sig" } });
     expect(res.content[1]).toEqual({ type: "tool_use", id: "tu_1", name: "evaluateMaintenance", input: {} });
   });

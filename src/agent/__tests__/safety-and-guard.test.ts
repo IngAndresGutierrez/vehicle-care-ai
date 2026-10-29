@@ -29,6 +29,13 @@ describe("SG — preclasificador de seguridad (antes del LLM)", () => {
     expect(classifySafety("hay una fuga de líquido de frenos").categories).toContain("BRAKE_FLUID_LEAK");
   });
 
+  it("SG-04b v1.1: variantes de orden e inflexión detectadas en la evaluación agéntica (Fase 8A)", () => {
+    expect(classifySafety("La aguja de la temperatura se fue al rojo").categories).toContain("OVERHEATING");
+    expect(classifySafety("huele a quemado cuando acelero").categories).toContain("FIRE_SMOKE_FUEL");
+    expect(classifySafety("Se me estalló una llanta en la autopista").categories).toContain("TIRES");
+    expect(classifySafety("se reventó el neumático trasero").categories).toContain("TIRES");
+  });
+
   it("SG-05 preguntas comerciales sobre frenos o aceite no disparan el escalamiento (D-24)", () => {
     for (const t of ["¿Cuánto cuesta cambiar las pastillas de freno?", "¿Qué mantenimiento le toca a mi carro?", "quiero cotizar el cambio de aceite", "¿Debo cambiar la correa?"]) {
       expect(classifySafety(t).hit, t).toBe(false);

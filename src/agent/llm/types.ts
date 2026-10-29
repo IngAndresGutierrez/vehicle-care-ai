@@ -35,7 +35,11 @@ export type LlmStopReason = "end_turn" | "tool_use" | "max_tokens" | "refusal" |
 export interface LlmResponse {
   stopReason: LlmStopReason;
   content: LlmBlock[];
-  usage: { inputTokens: number; outputTokens: number };
+  /**
+   * `inputTokens` es solo la parte NO cacheada; el prompt total es inputTokens + cacheRead + cacheCreation.
+   * Se separan porque cada tipo tiene tarifa distinta (lectura de caché ≪ entrada normal < escritura de caché).
+   */
+  usage: { inputTokens: number; outputTokens: number; cacheReadInputTokens?: number; cacheCreationInputTokens?: number };
   /** Modelo que respondió (puede diferir si actuó un fallback del proveedor). */
   servedBy: string;
 }

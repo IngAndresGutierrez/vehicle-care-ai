@@ -59,7 +59,7 @@ export interface TurnResult {
   journey: { state: JourneyState; allowedTools: readonly string[] };
   trace: {
     toolCalls: ToolCallRecord[];
-    llm: { provider: string; model: string; iterations: number; inputTokens: number; outputTokens: number; stopReason: string | null };
+    llm: { provider: string; model: string; iterations: number; inputTokens: number; outputTokens: number; cacheReadInputTokens: number; cacheCreationInputTokens: number; stopReason: string | null };
     safety: { triggered: boolean; categories: string[] };
     guard: { blocked: boolean; violations: GuardViolation[] };
     flags: string[];
@@ -124,7 +124,7 @@ export class MaintenanceAdvisor {
       assistant: { text: "", kind: "ASSISTANT", simulated: llm.info.simulated, model: llm.info.model },
       cards: [],
       journey: { state: "ACTIVATED", allowedTools: [] },
-      trace: { toolCalls: [], llm: { provider: llm.info.provider, model: llm.info.model, iterations: 0, inputTokens: 0, outputTokens: 0, stopReason: null }, safety: { triggered: false, categories: [] }, guard: { blocked: false, violations: [] }, flags: [] },
+      trace: { toolCalls: [], llm: { provider: llm.info.provider, model: llm.info.model, iterations: 0, inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, stopReason: null }, safety: { triggered: false, categories: [] }, guard: { blocked: false, violations: [] }, flags: [] },
       errors: [],
     };
 
@@ -174,6 +174,8 @@ export class MaintenanceAdvisor {
         result.trace.llm.iterations++;
         result.trace.llm.inputTokens += response.usage.inputTokens;
         result.trace.llm.outputTokens += response.usage.outputTokens;
+        result.trace.llm.cacheReadInputTokens += response.usage.cacheReadInputTokens ?? 0;
+        result.trace.llm.cacheCreationInputTokens += response.usage.cacheCreationInputTokens ?? 0;
         result.trace.llm.stopReason = response.stopReason;
         turnMessages.push({ role: "assistant", content: response.content });
 
@@ -216,9 +218,21 @@ export class MaintenanceAdvisor {
     }
 
     if (llmFailed) {
-      result.assistant.text = "El asistente no está disponible en este momento. Puedes intentarlo de nuevo o pedir que un asesor te contacte.";
-      // La transcripción no incluye este turno: un mensaje de sistema sin respuesta la dejaría inválida.
-      return this.persist(result, ctx, session, memory, transcript, false);
+      const last = turnMessages.at(-1);
+      const toolsCompleted = outcomes.length > 0 && last?.role === "user" && last.content.every((b) => b.type === "tool_result");
+      if (!toolsCompleted) {
+        result.assistant.text = "El asistente no está disponible en este momento. Puedes intentarlo de nuevo o pedir que un asesor te contacte.";
+        // La transcripción no incluye este turno: un mensaje de sistema sin respuesta la dejaría inválida.
+        return this.persist(result, ctx, session, memory, transcript, false);
+      }
+      // El proveedor falló DESPUÉS de ejecutar herramientas (p. ej. prepareBooking): sus efectos ya ocurrieron y el
+      // journey avanzó. No se descartan: se entregan las tarjetas (construidas desde los resultados, no del modelo) y
+      // la memoria, con un texto fijo sin cifras. Así el propietario no queda bloqueado ni repite acciones a ciegas.
+      result.assistant.text = "Avancé con tu solicitud, pero el asistente no pudo terminar la respuesta. Revisa la información de abajo; puedes continuar desde ahí o escribir de nuevo.";
+      result.trace.flags.push("LLM_FAILED_AFTER_TOOLS");
+      result.cards = buildCards(outcomes);
+      turnMessages.push({ role: "assistant", content: [{ type: "text", text: result.assistant.text }] });
+      return this.persist(result, ctx, session, this.applyOutcomes(memory, outcomes, now), [...transcript, ...turnMessages], false);
     }
     if (finalText === null) {
       finalText = "Necesito más tiempo para completar esta solicitud. ¿Puedes repetirla de forma más concreta o prefieres hablar con un asesor?";

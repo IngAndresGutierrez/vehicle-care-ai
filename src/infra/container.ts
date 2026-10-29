@@ -42,6 +42,7 @@ export function buildLlm(env: Env): LlmPort {
     timeoutMs: Number(env.LLM_TIMEOUT_MS ?? 30_000),
     maxRetries: Number(env.LLM_MAX_RETRIES ?? 2),
     serverFallbacks: env.LLM_SERVER_FALLBACKS !== "false",
+    promptCache: env.LLM_PROMPT_CACHE !== "false",
   });
 }
 

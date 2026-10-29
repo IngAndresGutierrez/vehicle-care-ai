@@ -11,6 +11,12 @@ export interface AnthropicLlmConfig {
   maxRetries: number;
   /** Fallback del lado del servidor ante rechazos por políticas (activado por defecto; LLM_SERVER_FALLBACKS=false lo desactiva). */
   serverFallbacks: boolean;
+  /**
+   * Prompt caching (LLM_PROMPT_CACHE, activado por defecto): punto de caché explícito al final del prefijo estable
+   * (herramientas + system) y caché automática de la cola de la conversación. El prefijo no cambia entre turnos
+   * (ADR-018), así que cada llamada del bucle relee lo anterior a tarifa de lectura de caché.
+   */
+  promptCache?: boolean;
   apiKey?: string;
   /** Solo tests: transporte HTTP inyectado para inspeccionar la solicitud sin red. */
   fetch?: typeof fetch;
@@ -36,7 +42,8 @@ export class AnthropicLlm implements LlmPort {
       {
         model: this.config.model,
         max_tokens: request.maxOutputTokens,
-        system: request.system,
+        system: this.config.promptCache === false ? request.system : [{ type: "text", text: request.system, cache_control: { type: "ephemeral" } }],
+        ...(this.config.promptCache === false ? {} : { cache_control: { type: "ephemeral" as const } }),
         messages: request.messages.map(toParam),
         tools: request.tools.map((t) => ({
           name: t.name,
@@ -54,7 +61,12 @@ export class AnthropicLlm implements LlmPort {
     return {
       stopReason: mapStop(response.stop_reason),
       content: response.content.map(fromBlock),
-      usage: { inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens },
+      usage: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
+        cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
+      },
       servedBy: response.model,
     };
   }

@@ -21,6 +21,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { Client } from "pg";
 import type { Card } from "../src/agent/cards";
 import type { TurnResult } from "../src/agent/maintenance-advisor";
+import { MODEL_PRICES } from "../src/agent/llm/pricing";
 import { ADVISOR_PROMPT_VERSION } from "../src/agent/prompts/advisor-v1";
 import { confirmBooking } from "../src/application/booking/confirm-booking";
 import { simulateSlotTaken, startDemoScenario, type DemoScenarioKey } from "../src/application/demo/demo-runs";
@@ -43,8 +44,7 @@ const effort = process.env.LLM_EFFORT ?? "medium";
  * de reportar). Escritura de caché de 5 minutos = 1,25 × entrada. Se pueden sobrescribir con EVAL_PRICES (JSON).
  */
 const PRICES: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
-  "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
-  "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
+  ...MODEL_PRICES,
   ...(process.env.EVAL_PRICES ? (JSON.parse(process.env.EVAL_PRICES) as Record<string, never>) : {}),
 };
 

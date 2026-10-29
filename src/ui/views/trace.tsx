@@ -203,6 +203,48 @@ export function TraceViewPage() {
                   </ul>
                 )}
               </Panel>
+              <Panel className="p-5" aria-labelledby="perf-title">
+                <h2 id="perf-title" className="text-lg font-semibold text-ink">
+                  Rendimiento por turno
+                </h2>
+                <p className="text-sm text-muted">Duración por fase, tokens y costo estimado con tarifas de referencia (la facturación real está en la consola del proveedor).</p>
+                {trace.turnMetrics.length === 0 ? (
+                  <p className="mt-2 text-sm text-muted">Sin turnos del asistente.</p>
+                ) : (
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="w-full text-left text-[13px] tabular" data-testid="turn-metrics">
+                      <thead className="text-muted">
+                        <tr>
+                          <th className="py-1 pr-2 font-medium">Hora</th>
+                          <th className="py-1 pr-2 font-medium">Total</th>
+                          <th className="py-1 pr-2 font-medium">IA</th>
+                          <th className="py-1 pr-2 font-medium">Herram.</th>
+                          <th className="py-1 pr-2 font-medium">BD y orq.</th>
+                          <th className="py-1 pr-2 font-medium">Caché</th>
+                          <th className="py-1 font-medium">Costo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {trace.turnMetrics.map((t, i) => {
+                          const m = t.metrics as { timings?: { totalMs: number; llmMs: number; gatewayMs: number; dbMs: number }; llm?: { cacheHitRatio: number | null; costUsd: number | null } };
+                          const ms = (n?: number) => (n === undefined ? "—" : n >= 1000 ? `${(n / 1000).toFixed(1)} s` : `${n} ms`);
+                          return (
+                            <tr key={i} className="border-t border-line">
+                              <td className="py-1 pr-2 text-muted">{timeFmt.format(new Date(t.createdAt))}</td>
+                              <td className="py-1 pr-2">{ms(m.timings?.totalMs)}</td>
+                              <td className="py-1 pr-2">{ms(m.timings?.llmMs)}</td>
+                              <td className="py-1 pr-2">{ms(m.timings?.gatewayMs)}</td>
+                              <td className="py-1 pr-2">{ms(m.timings?.dbMs)}</td>
+                              <td className="py-1 pr-2">{m.llm?.cacheHitRatio == null ? "—" : `${Math.round(m.llm.cacheHitRatio * 100)} %`}</td>
+                              <td className="py-1">{m.llm?.costUsd == null ? "—" : `USD ${m.llm.costUsd.toFixed(4)}`}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Panel>
             </div>
           </div>
         </div>

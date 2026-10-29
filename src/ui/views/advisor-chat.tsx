@@ -13,6 +13,8 @@ interface Msg {
   text: string;
   cards?: Card[];
   simulated?: boolean;
+  /** Modelo que generó la respuesta (solo IA real). */
+  model?: string;
   tone?: "ok" | "danger" | "neutral";
 }
 
@@ -58,6 +60,17 @@ export function AdvisorChat({
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  // Segundos de espera del turno en curso: con IA real un turno toma varios segundos (p50 ≈ 4 s, p95 ≈ 7 s).
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!busy) return;
+    const started = Date.now();
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => {
+      clearInterval(id);
+      setElapsed(0);
+    };
+  }, [busy]);
   const [failed, setFailed] = useState<{ text: string; message: string } | null>(null);
   const [confirmState, setConfirmState] = useState<"idle" | "confirming" | "done" | "failed">("idle");
   const [sent, setSent] = useState<string[]>([]);
@@ -82,13 +95,19 @@ export function AdvisorChat({
       setSessionId(r.sessionId);
       // Una intención nueva reemplaza la anterior: el botón de confirmar vuelve a habilitarse.
       if (r.cards.some((c) => c.type === "BOOKING_INTENT")) setConfirmState("idle");
-      push({ role: r.assistant.kind === "SYSTEM_NOTICE" ? "notice" : "assistant", text: r.assistant.text, cards: r.cards, simulated: r.assistant.simulated, tone: r.assistant.kind === "SYSTEM_NOTICE" ? "danger" : undefined });
+      push({ role: r.assistant.kind === "SYSTEM_NOTICE" ? "notice" : "assistant", text: r.assistant.text, cards: r.cards, simulated: r.assistant.simulated, model: r.assistant.simulated ? undefined : r.assistant.model, tone: r.assistant.kind === "SYSTEM_NOTICE" ? "danger" : undefined });
+      // Fallo del proveedor ANTES de ejecutar acciones: reintentar el mismo mensaje es seguro. Si ya se ejecutaron
+      // herramientas, sus resultados están en las tarjetas y no se ofrece repetir (Fase 8C).
+      const providerDown = r.errors.some((e) => e.code === "LLM_UNAVAILABLE" || e.code === "LLM_TIMEOUT");
+      if (providerDown && !r.trace.flags.includes("LLM_FAILED_AFTER_TOOLS")) setFailed({ text: message, message: "El asistente tuvo un problema técnico y no alcanzó a responder. Tu información no cambió; puedes reintentar." });
       onChanged();
     } catch (e) {
       const err = e instanceof ApiError ? e : null;
       const messageText =
         err?.code === "RATE_LIMITED"
           ? "Enviaste muchos mensajes seguidos. Espera un momento y reintenta."
+          : err?.code === "LEASE_LOST"
+            ? "Otro mensaje tomó esta conversación. Recarga la página para ver el estado actual."
           : err?.code === "TURN_IN_PROGRESS" || err?.code === "CONCURRENT_TURN"
             ? "Tu mensaje anterior todavía se está procesando. Espera la respuesta y vuelve a intentarlo."
           : err?.code === "NETWORK"
@@ -177,6 +196,7 @@ export function AdvisorChat({
               <div className="max-w-[95%] space-y-2">
                 <div className="rounded-2xl rounded-bl-sm bg-paper px-4 py-2.5 text-[15px] whitespace-pre-line text-graphite">{m.text}</div>
                 {m.simulated && <p className="text-[12px] text-muted">Respuesta programada (simulación, no IA generativa).</p>}
+                {m.model && <p className="text-[12px] text-muted">Respuesta generada por IA ({m.model}). Las cifras válidas son las de las tarjetas.</p>}
                 {m.cards?.map((c, i) => (
                   <CardView
                     key={`${m.id}-${i}`}
@@ -189,7 +209,7 @@ export function AdvisorChat({
             )}
           </div>
         ))}
-        {busy && <Spinner label="El asistente está consultando" />}
+        {busy && <Spinner label={elapsed >= 20 ? "Está tardando más de lo normal; sigue trabajando, no envíes el mensaje de nuevo" : elapsed >= 6 ? "Sigue trabajando: consultando el motor de reglas y el taller" : "El asistente está consultando"} />}
         {failed && (
           <div role="alert" className="rounded-lg border border-brake/30 bg-brake-soft px-4 py-3 text-sm">
             <p className="text-graphite">{failed.message}</p>

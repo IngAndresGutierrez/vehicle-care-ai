@@ -120,3 +120,83 @@ describe("Sesiones vencidas y respuestas parciales", () => {
     expect((await findJourney(db, { vehicleId: V.v1, serviceCode: OIL }))?.state).toBe("QUOTE_PRESENTED");
   });
 });
+
+describe("Lease con fencing token (Fase 8C)", () => {
+  it("si el lease vence durante un turno lento y otro turno lo toma, el turno viejo se detiene: no ejecuta más herramientas ni escribe", async () => {
+    const s = await say(db, OWNER_C1, V.v1, "¿Qué mantenimiento le toca a mi carro?");
+    // Turno A: la segunda llamada al modelo queda «colgada» hasta que la soltamos; luego pide una herramienta.
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const inner = new ScriptedLlm();
+    let calls = 0;
+    const slow: LlmPort = {
+      info: { provider: "SCRIPTED", model: "slow (prueba)", simulated: true },
+      complete: async (req) => {
+        if (++calls === 2) {
+          await gate;
+          return { stopReason: "tool_use", content: [{ type: "tool_use", id: "late", name: "listWorkshops", input: {} }], usage: { inputTokens: 1, outputTokens: 1 }, servedBy: "slow" };
+        }
+        return inner.complete(req);
+      },
+    };
+    const turnA = turn(slow, "¿Cuánto cuesta?", s.sessionId);
+    await new Promise((r) => setTimeout(r, 300));
+    const toolsDuringA = await db.toolCall.count({ where: { sessionId: s.sessionId } });
+
+    // El lease de A vence (por ejemplo, proceso degradado) y el turno B lo toma y termina.
+    await db.$executeRaw`UPDATE "ConversationSession" SET "turnLockedUntil" = now() - interval '1 second' WHERE id = ${s.sessionId}`;
+    const turnB = await turn(new ScriptedLlm(), "¿Cuánto cuesta?", s.sessionId);
+    expect(turnB.ok).toBe(true);
+    const afterB = await db.conversationSession.findUniqueOrThrow({ where: { id: s.sessionId } });
+    const toolsAfterB = await db.toolCall.count({ where: { sessionId: s.sessionId } });
+
+    release();
+    const a = await turnA;
+    expect(a.ok ? "OK" : a.error.code).toBe("LEASE_LOST");
+    // A no ejecutó la herramienta pedida después de perder el lease ni escribió sobre B.
+    expect(await db.toolCall.count({ where: { sessionId: s.sessionId } })).toBe(toolsAfterB);
+    expect(toolsAfterB).toBeGreaterThanOrEqual(toolsDuringA);
+    const final = await db.conversationSession.findUniqueOrThrow({ where: { id: s.sessionId } });
+    expect(final.turnCount).toBe(afterB.turnCount);
+    assertValidTranscript(await transcriptOf(s.sessionId));
+  });
+
+  it("un turno nunca libera el lease de otro, y la toma usa la hora de la base", async () => {
+    const { TurnLease } = await import("@/agent/turn-lease");
+    const s = await say(db, OWNER_C1, V.v1, "hola");
+    const l1 = await TurnLease.acquire(db, s.sessionId, 60_000);
+    expect(l1).not.toBeNull();
+    expect(await TurnLease.acquire(db, s.sessionId, 60_000)).toBeNull(); // ocupado
+    await db.$executeRaw`UPDATE "ConversationSession" SET "turnLockedUntil" = now() - interval '1 second' WHERE id = ${s.sessionId}`;
+    const l2 = await TurnLease.acquire(db, s.sessionId, 60_000);
+    expect(l2).not.toBeNull();
+    await l1!.release(); // el dueño anterior intenta liberar: no debe afectar a l2
+    const row = await db.conversationSession.findUniqueOrThrow({ where: { id: s.sessionId } });
+    expect(row.turnLeaseId).toBe(l2!.leaseId);
+    expect(await l1!.renew()).toBe(false);
+    expect(await l2!.renew()).toBe(true);
+    await l2!.release();
+    expect((await db.conversationSession.findUniqueOrThrow({ where: { id: s.sessionId } })).turnLeaseId).toBeNull();
+  });
+});
+
+describe("Observabilidad por turno (Fase 8C)", () => {
+  it("persiste duraciones por fase, tokens, caché y costo estimado, sin texto del mensaje", async () => {
+    const priced: LlmPort = {
+      info: { provider: "ANTHROPIC", model: "claude-sonnet-5-5", simulated: false },
+      complete: async (req) => ({ ...(await new ScriptedLlm().complete(req)), usage: { inputTokens: 100, outputTokens: 50, cacheReadInputTokens: 2_000, cacheCreationInputTokens: 0 } }),
+    };
+    const r = await turn(priced, "¿Qué mantenimiento le toca a mi carro?");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const t = r.value.trace.timings;
+    expect(t.totalMs).toBeGreaterThanOrEqual(t.llmMs + t.gatewayMs);
+    expect(t.toolsMs).toBeLessThanOrEqual(t.gatewayMs + 1);
+    expect(r.value.trace.llm.costUsd).toBeGreaterThan(0);
+    const msg = await db.conversationMessage.findFirstOrThrow({ where: { sessionId: r.value.sessionId, role: { not: "USER" } }, orderBy: { createdAt: "desc" } });
+    const m = msg.metrics as { timings: Record<string, number>; llm: { cacheHitRatio: number; costUsd: number; model: string } };
+    expect(m.llm).toMatchObject({ model: "claude-sonnet-5-5", cacheHitRatio: expect.any(Number), costUsd: expect.any(Number) });
+    expect(Object.keys(m.timings).sort()).toEqual(["dbMs", "gatewayMs", "llmMs", "toolsMs", "totalMs"]);
+    expect(JSON.stringify(msg.metrics)).not.toContain("mantenimiento");
+  });
+});

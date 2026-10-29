@@ -684,6 +684,8 @@ model ConversationSession {
   lastActiveAt    DateTime              @updatedAt
   /// Lease de turno (Fase 8B): un solo turno a la vez por sesión; vence solo si el proceso cae a mitad de un turno.
   turnLockedUntil DateTime?
+  /// Fencing token del turno que tiene el lease (Fase 8C): solo ese turno puede renovar, liberar o escribir.
+  turnLeaseId     String?
   messages        ConversationMessage[]
   toolCalls       ToolCall[]
 }
@@ -698,6 +700,8 @@ model ConversationMessage {
   traceId   String
   flagged   String[] // SAFETY_HIT, INJECTION_SUSPECT, OUTPUT_BLOCKED
   createdAt DateTime            @default(now())
+  /// Métricas del turno (Fase 8C): duraciones por fase, tokens, caché y costo estimado. Sin texto ni datos personales.
+  metrics   Json?
 
   @@index([sessionId, createdAt])
 }

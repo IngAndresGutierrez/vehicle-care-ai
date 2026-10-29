@@ -135,6 +135,19 @@ function toCard(tool: string, d: Record<string, never>): Card | null {
   }
 }
 
+/** Tarjeta de reserva preparada a partir del resultado tipado (también para la reentrega tras perder la respuesta). */
+export function intentCard(d: { intentId: string; expiresAt: Date | string; confirmationToken?: string; summary: { serviceCode: string; workshopId: string; workshopName: string; slotRef: string; startsAt: Date | string; totalCop: number; taxCop: number; source: string } }): Card {
+  const s = d.summary;
+  return {
+    type: "BOOKING_INTENT",
+    intentId: d.intentId,
+    expiresAt: iso(d.expiresAt),
+    requiresUserConfirmation: true,
+    summary: { serviceCode: s.serviceCode, workshopId: s.workshopId, workshopName: s.workshopName, slotRef: s.slotRef, startsAt: iso(s.startsAt), totalCop: s.totalCop, taxCop: s.taxCop, source: s.source },
+    confirmationToken: d.confirmationToken,
+  };
+}
+
 /** Versión para persistir: sin token de confirmación. */
 export function redactCards(cards: readonly Card[]): Card[] {
   return cards.map((c) => {

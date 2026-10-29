@@ -8,13 +8,20 @@ import { decideProcessingConsent } from "@/domain/policies/consent-policy";
 import { toLocalDate } from "@/domain/shared/local-date";
 import { err, ok, type Result } from "@/domain/shared/result";
 import type { Prisma } from "@/generated/prisma/client";
-import { buildCards, redactCards, type Card } from "./cards";
+import { reissuePendingIntent } from "@/application/booking/prepare-booking";
+import { getMaintenancePlan } from "@/application/get-maintenance-plan";
+import { buildCards, intentCard, redactCards, type Card } from "./cards";
 import { ToolGateway, type AgentSessionContext, type GatewayDeps, type ToolCallRecord, type ToolOutcome } from "./gateway";
 import { CONTEXT_HEADER } from "./llm/scripted-llm";
 import type { LlmBlock, LlmMessage, LlmPort } from "./llm/types";
 import { parseMemory, pruneMemory, type AdvisorMemory } from "./memory";
 import { checkOutput, GUARD_FALLBACK_TEXT, numbersIn, type GuardFacts, type GuardViolation } from "./output-guard";
 import { ADVISOR_PROMPT_VERSION, ADVISOR_SYSTEM_PROMPT } from "./prompts/advisor-v1";
+import { TurnLease } from "./turn-lease";
+import { estimateCostUsd } from "./llm/pricing";
+
+/** El lease del turno pasó a otro turno: este se detiene sin ejecutar más herramientas ni escribir. */
+class LeaseLostError extends Error {}
 import { detectInjection } from "./safety/injection";
 import { classifySafety, safetyTemplate } from "./safety/lexicon";
 import { LLM_TOOL_DEFINITIONS } from "./tools/definitions";
@@ -62,7 +69,9 @@ export interface TurnResult {
   journey: { state: JourneyState; allowedTools: readonly string[] };
   trace: {
     toolCalls: ToolCallRecord[];
-    llm: { provider: string; model: string; iterations: number; inputTokens: number; outputTokens: number; cacheReadInputTokens: number; cacheCreationInputTokens: number; stopReason: string | null };
+    llm: { provider: string; model: string; iterations: number; inputTokens: number; outputTokens: number; cacheReadInputTokens: number; cacheCreationInputTokens: number; stopReason: string | null; costUsd: number | null };
+    /** Duraciones del turno en ms (Fase 8C). dbMs = total − LLM − gateway: base de datos y orquestación. */
+    timings: { totalMs: number; llmMs: number; gatewayMs: number; toolsMs: number; dbMs: number };
     safety: { triggered: boolean; categories: string[] };
     guard: { blocked: boolean; violations: GuardViolation[] };
     flags: string[];
@@ -84,11 +93,15 @@ const MEMORY_TTL_MS = 30 * 60_000;
 export class MaintenanceAdvisor {
   private readonly limits: AdvisorLimits;
 
+  /** Inicio de cada turno (para la duración total), sin exponerlo en la respuesta. */
+  private readonly turnStart = new WeakMap<TurnResult, number>();
+
   constructor(private readonly deps: AdvisorDeps) {
     this.limits = { ...DEFAULT_LIMITS, ...deps.limits };
   }
 
   async handleTurn(input: TurnInput): Promise<Result<TurnResult, TurnError>> {
+    const startedAt = performance.now();
     const { db, clock, llm } = this.deps;
     const now = clock.now();
     const serviceCode = input.serviceCode ?? "ENGINE_OIL_FILTER";
@@ -123,25 +136,25 @@ export class MaintenanceAdvisor {
     // ── Un solo turno a la vez por sesión (Fase 8B) ──
     // Lease atómico ANTES de ejecutar herramientas: un segundo mensaje simultáneo se rechaza sin efectos, en vez de
     // ejecutar herramientas en paralelo y fallar recién al guardar. El lease vence solo si el proceso cae a mitad del turno.
-    const leaseUntil = new Date(now.getTime() + this.limits.turnTimeoutMs + 15_000);
-    const lease = await db.conversationSession.updateMany({
-      where: { id: session.id, OR: [{ turnLockedUntil: null }, { turnLockedUntil: { lt: now } }] },
-      data: { turnLockedUntil: leaseUntil },
-    });
-    if (lease.count !== 1) return err({ status: 409, code: "TURN_IN_PROGRESS", message: "Hay otro mensaje en proceso en esta sesión; espera la respuesta e inténtalo de nuevo." });
+    // Fase 8C: fencing token + hora de la base (TurnLease). El TTL cubre el paso más largo posible (una llamada al LLM
+    // acotada por turnTimeoutMs) y se renueva antes de cada paso.
+    const lease = await TurnLease.acquire(db, session.id, this.limits.turnTimeoutMs + 15_000);
+    if (!lease) return err({ status: 409, code: "TURN_IN_PROGRESS", message: "Hay otro mensaje en proceso en esta sesión; espera la respuesta e inténtalo de nuevo." });
     try {
-      return await this.processTurn(input, session, now, serviceCode, message);
+      return await this.processTurn(input, { ...session, leaseId: lease.leaseId }, now, serviceCode, message, lease, startedAt);
     } finally {
-      await db.conversationSession.updateMany({ where: { id: session.id, turnLockedUntil: leaseUntil }, data: { turnLockedUntil: null } });
+      await lease.release();
     }
   }
 
   private async processTurn(
     input: TurnInput,
-    session: { id: string; turnCount: number; memory: unknown; transcript: unknown },
+    session: { id: string; turnCount: number; memory: unknown; transcript: unknown; leaseId: string },
     now: Date,
     serviceCode: string,
     message: string,
+    lease: TurnLease,
+    startedAt: number,
   ): Promise<Result<TurnResult, TurnError>> {
     const { db, llm } = this.deps;
     const ctx: AgentSessionContext = {
@@ -158,9 +171,10 @@ export class MaintenanceAdvisor {
       assistant: { text: "", kind: "ASSISTANT", simulated: llm.info.simulated, model: llm.info.model },
       cards: [],
       journey: { state: "ACTIVATED", allowedTools: [] },
-      trace: { toolCalls: [], llm: { provider: llm.info.provider, model: llm.info.model, iterations: 0, inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, stopReason: null }, safety: { triggered: false, categories: [] }, guard: { blocked: false, violations: [] }, flags: [] },
+      trace: { toolCalls: [], llm: { provider: llm.info.provider, model: llm.info.model, iterations: 0, inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, stopReason: null, costUsd: null }, timings: { totalMs: 0, llmMs: 0, gatewayMs: 0, toolsMs: 0, dbMs: 0 }, safety: { triggered: false, categories: [] }, guard: { blocked: false, violations: [] }, flags: [] },
       errors: [],
     };
+    this.turnStart.set(result, startedAt);
 
     // ── Consentimiento para tratar la conversación con IA (D-12): sin él no se procesa ni se guarda el mensaje ──
     const consents = await db.consent.findMany({ where: { customerId: input.owner.customerId ?? "" }, include: { events: true } });
@@ -191,9 +205,25 @@ export class MaintenanceAdvisor {
     // ── Bucle del agente ──
     const gateway = new ToolGateway(this.deps, ctx);
     const journeyNow = await findJourney(db, ctx);
+
+    // ── Reentrega de una reserva preparada cuya respuesta se perdió (Fase 8C) ──
+    // Si el journey espera la confirmación de una intención que esta sesión nunca entregó (caída tras prepareBooking,
+    // sesión renovada), se reemite su token con el mecanismo idempotente existente y se vuelve a mostrar la tarjeta.
+    let redelivered: Card | null = null;
+    const pendingId = journeyNow?.state === "AWAITING_CONFIRMATION" ? journeyNow.context.pendingIntentId : null;
+    if (pendingId && memory.pendingIntent?.intentId !== pendingId) {
+      const r = await reissuePendingIntent(this.deps, { actor: input.owner, vehicleId: ctx.vehicleId, serviceCode });
+      if (r.ok) {
+        redelivered = intentCard(r.value);
+        memory.pendingIntent = { intentId: r.value.intentId, expiresAt: new Date(r.value.expiresAt).toISOString() };
+        result.trace.flags.push("INTENT_REDELIVERED");
+      }
+    }
+    const withRedelivered = (cards: Card[]) => (redelivered && !cards.some((c) => c.type === "BOOKING_INTENT") ? [...cards, redelivered] : cards);
+
     const turnMessages: LlmMessage[] = [
       { role: "user", content: [{ type: "text", text: message }] },
-      { role: "system", content: [{ type: "text", text: this.contextBlock(journeyNow?.state ?? "ACTIVATED", serviceCode, memory) }] },
+      { role: "system", content: [{ type: "text", text: this.contextBlock(journeyNow?.state ?? "ACTIVATED", serviceCode, memory, redelivered !== null) }] },
     ];
     const outcomes: ToolOutcome[] = [];
     let finalText: string | null = null;
@@ -204,7 +234,10 @@ export class MaintenanceAdvisor {
 
     try {
       for (let i = 0; i < this.limits.maxIterations; i++) {
+        if (!(await lease.renew())) throw new LeaseLostError();
+        const llmStarted = performance.now();
         const response = await llm.complete({ system: ADVISOR_SYSTEM_PROMPT, messages: [...transcript, ...turnMessages], tools: LLM_TOOL_DEFINITIONS, maxOutputTokens: this.limits.maxOutputTokensPerCall, signal: abort.signal });
+        result.trace.timings.llmMs += performance.now() - llmStarted;
         result.trace.llm.iterations++;
         result.trace.llm.inputTokens += response.usage.inputTokens;
         result.trace.llm.outputTokens += response.usage.outputTokens;
@@ -227,7 +260,12 @@ export class MaintenanceAdvisor {
         const toolResults: LlmBlock[] = [];
         for (const block of response.content) {
           if (block.type !== "tool_use") continue;
+          // Nunca se ejecuta una herramienta si otro turno tomó la sesión (sin doble ejecución).
+          if (!(await lease.renew())) throw new LeaseLostError();
+          const gwStarted = performance.now();
           const outcome = await gateway.execute(block.name, block.input);
+          result.trace.timings.gatewayMs += performance.now() - gwStarted;
+          result.trace.timings.toolsMs += outcome.record.durationMs;
           outcomes.push(outcome);
           result.trace.toolCalls.push(outcome.record);
           if (!outcome.ok && outcome.error.retryable) result.errors.push({ code: outcome.error.code, message: outcome.error.userSafeMessage, retryable: true });
@@ -243,6 +281,10 @@ export class MaintenanceAdvisor {
         }
       }
     } catch (error) {
+      if (error instanceof LeaseLostError) {
+        clearTimeout(timer);
+        return err({ status: 409, code: "LEASE_LOST", message: "Otro mensaje tomó esta conversación; recarga para ver el estado actual." });
+      }
       llmFailed = true;
       result.errors.push({ code: abort.signal.aborted ? "LLM_TIMEOUT" : "LLM_UNAVAILABLE", message: "El asistente no está disponible en este momento.", retryable: true });
       void error;
@@ -263,6 +305,7 @@ export class MaintenanceAdvisor {
       const toolsCompleted = outcomes.length > 0 && last?.role === "user" && last.content.every((b) => b.type === "tool_result");
       if (!toolsCompleted) {
         result.assistant.text = "El asistente no está disponible en este momento. Puedes intentarlo de nuevo o pedir que un asesor te contacte.";
+        result.cards = withRedelivered([]);
         // La transcripción no incluye este turno: un mensaje de sistema sin respuesta la dejaría inválida.
         return this.persist(result, ctx, session, memory, transcript, false);
       }
@@ -271,7 +314,7 @@ export class MaintenanceAdvisor {
       // la memoria, con un texto fijo sin cifras. Así el propietario no queda bloqueado ni repite acciones a ciegas.
       result.assistant.text = "Avancé con tu solicitud, pero el asistente no pudo terminar la respuesta. Revisa la información de abajo; puedes continuar desde ahí o escribir de nuevo.";
       result.trace.flags.push("LLM_FAILED_AFTER_TOOLS");
-      result.cards = buildCards(outcomes);
+      result.cards = withRedelivered(buildCards(outcomes));
       // La tarjeta de evaluación sí llega al propietario: misma transición que en el camino normal (Fase 8B).
       await this.markRecommendationShown(result.cards, ctx, serviceCode, input.traceId);
       turnMessages.push({ role: "assistant", content: [{ type: "text", text: result.assistant.text }] });
@@ -299,7 +342,7 @@ export class MaintenanceAdvisor {
       updated.previousResponseBlocked = false;
     }
     result.assistant.text = finalText;
-    result.cards = buildCards(outcomes);
+    result.cards = withRedelivered(buildCards(outcomes));
 
     await this.markRecommendationShown(result.cards, ctx, serviceCode, input.traceId);
 
@@ -370,7 +413,7 @@ export class MaintenanceAdvisor {
    * tamaño. Solo lleva lo que el modelo necesita para decidir; el detalle (horarios, desgloses de precio, intervalos)
    * ya está en los resultados de herramientas de la transcripción. La memoria completa sigue guardada para la guardia.
    */
-  private contextBlock(state: JourneyState, serviceCode: string, memory: AdvisorMemory): string {
+  private contextBlock(state: JourneyState, serviceCode: string, memory: AdvisorMemory, intentRedelivered = false): string {
     const e = memory.lastEvaluation;
     return `${CONTEXT_HEADER}\n${JSON.stringify({
       journeyState: state,
@@ -388,6 +431,7 @@ export class MaintenanceAdvisor {
         openCaseRefs: memory.openCaseRefs,
       },
       previousResponseBlocked: memory.previousResponseBlocked,
+      ...(intentRedelivered ? { pendingIntentRedelivered: "La reserva preparada sigue pendiente; su tarjeta se volvió a mostrar con un botón de confirmación nuevo." } : {}),
     })}`;
   }
 
@@ -454,7 +498,7 @@ export class MaintenanceAdvisor {
       addDate(memory.lastEvaluation.dueByDate);
       if (memory.lastEvaluation.remainingDays != null) periods.add(Math.abs(memory.lastEvaluation.remainingDays));
     }
-    for (const i of memory.plan?.intervals ?? []) {
+    for (const i of (memory.plan?.intervals ?? []).filter((x) => x.serviceCode === ctx.serviceCode)) {
       addKm(i.intervalKm);
       if (i.intervalMonths != null) periods.add(i.intervalMonths);
     }
@@ -521,24 +565,31 @@ export class MaintenanceAdvisor {
     ctx: AgentSessionContext,
     f: { amounts: Set<number>; kilometers: Set<number>; periods: Set<number>; addDate: (v: unknown) => unknown },
   ): Promise<void> {
+    // Acotados (Fase 8C) a: vehículo autorizado del propietario, servicio de la sesión, plan VALIDADO vigente,
+    // última evaluación, cotizaciones vigentes y datos no rechazados ni reemplazados.
     const { db, clock } = this.deps;
     const now = clock.now();
     const vehicleId = ctx.vehicleId;
-    const [readings, records, evaluation, quotes, intents, cases, vehicle] = await Promise.all([
-      db.odometerReading.findMany({ where: { vehicleId }, select: { valueKm: true, observedAt: true }, orderBy: { observedAt: "desc" }, take: 20 }),
-      db.serviceRecord.findMany({ where: { vehicleId }, select: { odometerKm: true, performedOn: true }, take: 50 }),
-      db.maintenanceEvaluation.findFirst({ where: { vehicleId, serviceCode: ctx.serviceCode }, orderBy: { evaluatedAt: "desc" }, select: { dueByKm: true, remainingKm: true, dueByDate: true, remainingDays: true } }),
-      db.quote.findMany({ where: { vehicleId, serviceCode: ctx.serviceCode, validUntil: { gt: now } }, select: { subtotalCop: true, taxCop: true, totalCop: true, validUntil: true }, take: 10 }),
-      db.bookingIntent.findMany({ where: { vehicleId, status: "AWAITING_USER", expiresAt: { gt: now } }, select: { expiresAt: true }, take: 5 }),
+    const serviceCode = ctx.serviceCode;
+    const [readings, records, evaluation, quotes, intents, cases, journey, plan] = await Promise.all([
+      db.odometerReading.findMany({ where: { vehicleId, verification: { not: "REJECTED" } }, select: { id: true, valueKm: true, observedAt: true, supersedesId: true }, orderBy: { observedAt: "desc" }, take: 20 }),
+      db.serviceRecord.findMany({ where: { vehicleId }, select: { id: true, odometerKm: true, performedOn: true, supersedesId: true }, take: 50 }),
+      db.maintenanceEvaluation.findFirst({ where: { vehicleId, serviceCode }, orderBy: { evaluatedAt: "desc" }, select: { dueByKm: true, remainingKm: true, dueByDate: true, remainingDays: true } }),
+      db.quote.findMany({ where: { vehicleId, serviceCode, status: "ACTIVE", validUntil: { gt: now } }, select: { subtotalCop: true, taxCop: true, totalCop: true, validUntil: true }, take: 10 }),
+      db.bookingIntent.findMany({ where: { vehicleId, serviceCode, customerId: ctx.owner.customerId, status: "AWAITING_USER", expiresAt: { gt: now } }, select: { expiresAt: true }, take: 5 }),
       db.humanCase.findMany({ where: { vehicleId, status: { in: ["OPEN", "ASSIGNED"] } }, select: { slaDueAt: true }, take: 10 }),
-      db.vehicle.findUnique({ where: { id: vehicleId }, select: { specId: true } }),
+      findJourney(db, ctx),
+      getMaintenancePlan({ db, clock }, { actor: ctx.owner, vehicleId }),
     ]);
-    for (const r of readings) {
+    const superseded = (rows: Array<{ supersedesId: string | null }>) => new Set(rows.flatMap((r) => (r.supersedesId ? [r.supersedesId] : [])));
+    const replacedReadings = superseded(readings);
+    for (const r of readings.filter((x) => !replacedReadings.has(x.id))) {
       f.kilometers.add(r.valueKm);
       f.addDate(r.observedAt);
       f.periods.add(Math.max(0, Math.floor((now.getTime() - r.observedAt.getTime()) / 86_400_000)));
     }
-    for (const r of records) {
+    const replacedRecords = superseded(records);
+    for (const r of records.filter((x) => !replacedRecords.has(x.id))) {
       f.kilometers.add(r.odometerKm);
       f.addDate(r.performedOn);
     }
@@ -551,18 +602,46 @@ export class MaintenanceAdvisor {
       [q.subtotalCop, q.taxCop, q.totalCop].forEach((n) => n != null && f.amounts.add(n));
       f.addDate(q.validUntil);
     }
+    // La cotización de la reserva activa del journey (ya consumida) sigue siendo el respaldo de su precio.
+    if (journey?.context.activeBookingId) {
+      const b = await db.booking.findUnique({ where: { id: journey.context.activeBookingId }, include: { quote: true } });
+      if (b?.quote) [b.quote.subtotalCop, b.quote.taxCop, b.quote.totalCop].forEach((n) => n != null && f.amounts.add(n));
+      if (b) f.addDate(b.startsAt);
+    }
     intents.forEach((i) => f.addDate(i.expiresAt));
     cases.forEach((c) => f.addDate(c.slaDueAt));
-    if (vehicle) {
-      const rules = await db.maintenanceRule.findMany({
-        where: { planVersion: { status: "VALIDATED", plan: { applicability: { some: { specId: vehicle.specId } } } } },
-        select: { intervalKm: true, intervalMonths: true },
-      });
-      for (const r of rules) {
+    // Solo el intervalo del servicio de esta conversación: «el aceite cada 100.000 km» (intervalo de la correa) se bloquea.
+    if (plan.ok) {
+      for (const r of plan.value.rules.filter((x) => x.serviceCode === serviceCode)) {
         if (r.intervalKm != null) f.kilometers.add(r.intervalKm);
         if (r.intervalMonths != null) f.periods.add(r.intervalMonths);
       }
     }
+  }
+
+  /** Cierra las duraciones y el costo estimado del turno (tarifas de referencia; la facturación real es la de la consola). */
+  private finishMetrics(result: TurnResult): void {
+    const t = result.trace.timings;
+    const started = this.turnStart.get(result);
+    if (started !== undefined) t.totalMs = performance.now() - started;
+    t.dbMs = Math.max(0, t.totalMs - t.llmMs - t.gatewayMs);
+    for (const k of Object.keys(t) as Array<keyof typeof t>) t[k] = Math.round(t[k]);
+    const l = result.trace.llm;
+    const cost = estimateCostUsd(l.model, l);
+    l.costUsd = cost === null ? null : Number(cost.toFixed(6));
+  }
+
+  /** Métricas persistidas por turno: sin texto, sin identificadores personales, sin secretos. */
+  private metricsRecord(result: TurnResult) {
+    const l = result.trace.llm;
+    const promptTokens = l.inputTokens + l.cacheReadInputTokens + l.cacheCreationInputTokens;
+    return {
+      timings: result.trace.timings,
+      llm: { provider: l.provider, model: l.model, iterations: l.iterations, inputTokens: l.inputTokens, outputTokens: l.outputTokens, cacheReadInputTokens: l.cacheReadInputTokens, cacheCreationInputTokens: l.cacheCreationInputTokens, cacheHitRatio: promptTokens ? Number((l.cacheReadInputTokens / promptTokens).toFixed(3)) : null, costUsd: l.costUsd, stopReason: l.stopReason },
+      toolCalls: result.trace.toolCalls.length,
+      guardBlocked: result.trace.guard.blocked,
+      errors: result.errors.map((e) => e.code),
+    };
   }
 
   private async fillJourney(result: TurnResult, ctx: AgentSessionContext): Promise<void> {
@@ -575,15 +654,17 @@ export class MaintenanceAdvisor {
   private async persist(
     result: TurnResult,
     ctx: AgentSessionContext,
-    session: { id: string; turnCount: number },
+    session: { id: string; turnCount: number; leaseId?: string },
     memory: AdvisorMemory,
     transcript: LlmMessage[],
     blocked: boolean,
   ): Promise<Result<TurnResult, TurnError>> {
     const now = this.deps.clock.now();
+    this.finishMetrics(result);
     const updated = await this.deps.db.conversationSession.updateMany({
-      where: { id: session.id, turnCount: session.turnCount },
-      data: { memory: memory as unknown as Prisma.InputJsonValue, transcript: transcript as unknown as Prisma.InputJsonValue, turnCount: session.turnCount + 1 },
+      // Escritura con fencing: solo el turno dueño del lease y en orden (turnCount); libera el lease en la misma escritura.
+      where: { id: session.id, turnCount: session.turnCount, ...(session.leaseId ? { turnLeaseId: session.leaseId } : {}) },
+      data: { memory: memory as unknown as Prisma.InputJsonValue, transcript: transcript as unknown as Prisma.InputJsonValue, turnCount: session.turnCount + 1, turnLeaseId: null, turnLockedUntil: null },
     });
     if (updated.count !== 1) return err({ status: 409, code: "CONCURRENT_TURN", message: "Hay otro mensaje en proceso en esta sesión; inténtalo de nuevo." });
     await this.deps.db.conversationMessage.create({
@@ -593,6 +674,7 @@ export class MaintenanceAdvisor {
         content: result.assistant.text,
         cards: redactCards(result.cards) as unknown as Prisma.InputJsonValue,
         traceId: ctx.traceId,
+        metrics: this.metricsRecord(result) as unknown as Prisma.InputJsonValue,
         // Trazabilidad de fallos (Fase 8B): marcas de la traza, bloqueo de la guardia y códigos de error del turno.
         flagged: [...new Set([...result.trace.flags, ...(blocked ? ["OUTPUT_BLOCKED"] : []), ...result.errors.map((e) => `ERROR:${e.code}`)])],
         createdAt: now,

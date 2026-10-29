@@ -120,6 +120,21 @@ export async function prepareBooking(
   });
 }
 
+/**
+ * Recuperación (Fase 8C): si la respuesta con el token de confirmación se perdió (caída del proceso, sesión renovada),
+ * reemite el token de la intención PENDIENTE del journey con el mismo mecanismo que un reintento idempotente: no crea
+ * otra intención ni cambia el estado, y el token anterior deja de servir. Solo para el propietario titular.
+ */
+export async function reissuePendingIntent(deps: BookingDeps, cmd: { actor: ActorContext; vehicleId: string; serviceCode: string }): Promise<Result<PreparedBooking, AppError>> {
+  if (cmd.actor.role !== "OWNER") return err(appError("UNAUTHORIZED", "ROLE_NOT_PERMITTED"));
+  const access = await authorizeVehicleAccess(deps.db, cmd.actor, cmd.vehicleId, "READ_VEHICLE", deps.clock.now());
+  if (!access.ok) return access;
+  const journey = await findJourney(deps.db, { vehicleId: cmd.vehicleId, serviceCode: cmd.serviceCode });
+  const intentId = journey?.state === "AWAITING_CONFIRMATION" ? journey.context.pendingIntentId : null;
+  if (!intentId) return err(appError("NOT_FOUND", "NO_PENDING_INTENT"));
+  return reissueToken(deps, intentId, cmd.vehicleId);
+}
+
 async function reissueToken(deps: BookingDeps, intentId: string, vehicleId: string): Promise<Result<PreparedBooking, AppError>> {
   const { db, clock } = deps;
   const now = clock.now();

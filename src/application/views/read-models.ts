@@ -1,3 +1,4 @@
+import { Prisma } from "@/generated/prisma/client";
 import { allowedTools, replayJourney, type CaseResolutionOutcome, type JourneyEvent, type JourneyState } from "@/domain/journey";
 import { decideCaseResolution, decideVehicleAccess, isOwnershipActive, type ActorContext } from "@/domain/policies/access-policy";
 import { err, ok, type Result } from "@/domain/shared/result";
@@ -93,13 +94,20 @@ export async function getVehicleOverview(deps: Deps, { actor, vehicleId, service
   if (!history.ok) return history;
   const plan = await getMaintenancePlan(deps, { actor, vehicleId });
 
-  const [evaluation, journey, booking, intent, cases] = await Promise.all([
+  const [evaluation, journey, recentBookings, intent, cases] = await Promise.all([
     deps.db.maintenanceEvaluation.findFirst({ where: { vehicleId, serviceCode }, orderBy: { evaluatedAt: "desc" } }),
     findJourney(deps.db, { vehicleId, serviceCode }),
-    deps.db.booking.findFirst({ where: { vehicleId, serviceCode }, orderBy: { createdAt: "desc" }, include: { quote: true } }),
+    deps.db.booking.findMany({ where: { vehicleId, serviceCode }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 10, include: { quote: true } }),
     deps.db.bookingIntent.findFirst({ where: { vehicleId, serviceCode, status: "AWAITING_USER", expiresAt: { gt: deps.clock.now() } }, orderBy: { createdAt: "desc" } }),
     deps.db.humanCase.findMany({ where: { vehicleId, status: { in: ["OPEN", "ASSIGNED"] } }, orderBy: { createdAt: "desc" } }),
   ]);
+  // La reserva que muestra el portal es la que el journey considera activa; si no hay, una vigente antes que una fallida
+  // (tras un conflicto de cupo y una nueva confirmación, la fallida no debe tapar la confirmada; Fase 8C).
+  const booking =
+    recentBookings.find((b) => b.id === journey?.context.activeBookingId) ??
+    recentBookings.find((b) => b.status === "CONFIRMED" || b.status === "PENDING") ??
+    recentBookings[0] ??
+    null;
   const state: JourneyState = journey?.state ?? "ACTIVATED";
   const workshop = booking ? await deps.db.workshop.findUnique({ where: { id: booking.workshopId } }) : null;
 
@@ -166,6 +174,8 @@ export interface TraceView {
   toolCalls: Array<{ traceId: string; tool: string; ok: boolean; errorCode: string | null; source: string; durationMs: number; stateAtCall: string | null; summary: string; input: unknown; createdAt: string }>;
   evaluations: Array<{ evaluationId: string; status: string; technicalStatus: string; reasons: string[]; planVersion: string | null; sourceRef: string | null; engineVersion: string; inputHash: string; evaluatedAt: string; decisionTrace: Array<{ step: string; outcome: string }> }>;
   guardFlags: Array<{ createdAt: string; role: string; flags: string[]; traceId: string }>;
+  /** Rendimiento por turno del asistente (Fase 8C): duraciones, tokens, caché y costo estimado. */
+  turnMetrics: Array<{ createdAt: string; traceId: string; metrics: unknown }>;
   access: { basis: string };
 }
 
@@ -187,10 +197,11 @@ export async function getTraceView(
   const journey = await deps.db.journeyInstance.findFirst({ where: { vehicleId, serviceCode }, include: { events: { orderBy: { seq: "asc" } } } });
   const sessions = await deps.db.conversationSession.findMany({ where: { vehicleId, serviceCode }, select: { id: true } });
   const sessionIds = sessions.map((s) => s.id);
-  const [toolCalls, evaluations, messages] = await Promise.all([
+  const [toolCalls, evaluations, messages, metricRows] = await Promise.all([
     deps.db.toolCall.findMany({ where: { sessionId: { in: sessionIds } }, orderBy: { createdAt: "asc" }, take: 200 }),
     deps.db.maintenanceEvaluation.findMany({ where: { vehicleId, serviceCode }, orderBy: { evaluatedAt: "desc" }, take: 5 }),
     deps.db.conversationMessage.findMany({ where: { sessionId: { in: sessionIds }, NOT: { flagged: { isEmpty: true } } }, orderBy: { createdAt: "asc" }, select: { createdAt: true, role: true, flagged: true, traceId: true } }),
+    deps.db.conversationMessage.findMany({ where: { sessionId: { in: sessionIds }, role: { not: "USER" }, NOT: { metrics: { equals: Prisma.DbNull } } }, orderBy: { createdAt: "desc" }, take: 20, select: { createdAt: true, traceId: true, metrics: true } }),
   ]);
 
   let consistent = true;
@@ -244,6 +255,7 @@ export async function getTraceView(
       decisionTrace: ((e.decisionTrace as Array<{ step: string; outcome: string }>) ?? []).map(({ step, outcome }) => ({ step, outcome })),
     })),
     guardFlags: messages.map((m) => ({ createdAt: m.createdAt.toISOString(), role: m.role, flags: m.flagged, traceId: m.traceId })),
+    turnMetrics: metricRows.map((m) => ({ createdAt: m.createdAt.toISOString(), traceId: m.traceId, metrics: m.metrics })),
     access: { basis: decision.basis },
   });
 }

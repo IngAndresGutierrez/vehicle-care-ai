@@ -85,12 +85,12 @@ export async function handleDemoConfig(_request: Request, c: Container): Promise
 const ScenarioBody = z.object({ scenario: z.enum(["A", "B", "C", "D"]) }).strict();
 
 /**
- * IP del cliente para el limitador. Se toma la entrada MÁS A LA DERECHA de `x-forwarded-for`: la añade el proxy de
- * confianza (Railway la agrega al final; Vercel reemplaza la cabecera). La primera la controla el cliente y permitiría
- * saltarse el límite enviando una IP falsa (comprobado en Railway).
+ * IP del cliente para el limitador. Primero `x-real-ip`: el edge de Railway (y Vercel) la sobrescribe con la IP real.
+ * En Railway, `x-forwarded-for` no es fiable: la primera entrada la puede fijar el cliente (saltaba el límite con una
+ * IP falsa) y la última es una IP del pool de proxies, compartida entre visitantes (comprobado en producción).
  */
 export function clientIp(request: Request): string {
-  return request.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() || request.headers.get("x-real-ip") || "local";
+  return request.headers.get("x-real-ip")?.trim() || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
 }
 
 /**

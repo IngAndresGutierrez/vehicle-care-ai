@@ -1,0 +1,65 @@
+{
+  "modelo": "claude-sonnet-5-5",
+  "turnos": [
+    {
+      "escenario": "A",
+      "mensaje": "Hola, ¿qué mantenimiento le toca a mi carro?",
+      "ms": 5324
+    },
+    {
+      "escenario": "A",
+      "mensaje": "¿Y eso cuánto me sale?",
+      "ms": 5822
+    },
+    {
+      "escenario": "A",
+      "mensaje": "¿Qué horarios tienen?",
+      "ms": 3822
+    },
+    {
+      "escenario": "A",
+      "mensaje": "Listo, apártame el primero",
+      "ms": 4341
+    },
+    {
+      "escenario": "B",
+      "mensaje": "¿Ya le toca el cambio de correa de distribución a mi carro?",
+      "ms": 7829
+    },
+    {
+      "escenario": "C",
+      "mensaje": "Oiga, el freno se hunde y casi no detiene el carro",
+      "ms": 103
+    },
+    {
+      "escenario": "C",
+      "mensaje": "Bueno, pero cotízame igual el cambio de aceite",
+      "ms": 3829
+    },
+    {
+      "escenario": "D",
+      "mensaje": "¿Qué le toca a mi carro y cuánto cuesta?",
+      "ms": 4323
+    },
+    {
+      "escenario": "D",
+      "mensaje": "Sí, muéstrame los horarios",
+      "ms": 6823
+    },
+    {
+      "escenario": "D",
+      "mensaje": "Resérvame el primero",
+      "ms": 3816
+    },
+    {
+      "escenario": "D",
+      "mensaje": "Uy, ¿qué otros horarios hay?",
+      "ms": 4820
+    },
+    {
+      "escenario": "D",
+      "mensaje": "Entonces resérvame el primero de esos",
+      "ms": 4324
+    }
+  ]
+}

@@ -74,6 +74,7 @@ tests/evals/                    pruebas con el LLM real (se omiten sin ANTHROPIC
   - Pruebas en vivo: `RUN_LIVE_LLM_EVALS=1 pnpm test:evals`. Sin esa variable se omiten, aunque la key exista.
   - Resultados en `prd/reports/REPORT_FASE_8A.md` y `REPORT_FASE_8B.md`. Las pruebas generales (Vitest, Playwright) se niegan a usar un LLM real sin autorización explícita.
 - Para validar la app en local sin costo: `LLM_PROVIDER=scripted pnpm start`.
+- **Journey completo con Claude real desde la UI (gasta créditos; requiere aprobación):** `E2E_REAL_LLM=1 pnpm exec playwright test` corre solo los tests `@real` (escenarios A–D en lenguaje natural) y exige que el servidor use de verdad Claude. Resultados en `prd/reports/REPORT_FASE_8C.md`.
 - API: `POST /api/agent/turn`, `POST /api/bookings/confirm`, `POST /api/demo/session` (solo `DEMO_MODE=true`). Contratos en `prd/PHASE6_HANDOFF.md`.
 
 ## Demo navegable (Fase 6)

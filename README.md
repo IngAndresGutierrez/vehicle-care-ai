@@ -93,9 +93,9 @@ Todo lo simulado lleva un sello punteado. Con `LLM_PROVIDER=scripted` el asisten
 
 Pantallas: `/` (escenarios), `/vehiculo/[id]` (portal y asistente), `/trazas/[id]`, `/casos`. API y decisiones: ADR-019 y ADR-020.
 
-## Despliegue en Vercel
+## Despliegue (Railway)
 
-**No desplegado; no hay URL pública.** El build compila sin secretos ni base, así que es apto para Vercel. La auditoría de configuración y los pasos exactos (Postgres del Marketplace, variables, `migrate deploy` con la URL directa, verificación con `E2E_BASE_URL=<url> pnpm test:e2e` y reversión) están en [`prd/DESPLIEGUE.md`](./prd/DESPLIEGUE.md).
+**Demo pública:** https://vehicle-care-web-production-c5e6.up.railway.app. Proyecto Railway `vehicle-care-ai`: servicio `vehicle-care-web` (Next.js) y `Postgres` (red privada, volumen persistente), región US East. Datos sintéticos. Claude Sonnet 5.5 real con tope global de gasto de USD 5 / 24 h (`LLM_DAILY_BUDGET_USD`). Configuración en `.railway/railway.ts`, CI en `.github/workflows/ci.yml`. Detalle, verificación, rollback y costos en [`prd/DESPLIEGUE.md`](./prd/DESPLIEGUE.md).
 
 ## Entrega
 

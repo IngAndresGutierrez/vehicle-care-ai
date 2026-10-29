@@ -17,7 +17,7 @@
 
 ## 1. Cómo ejecutarlo
 
-**URL pública: no publicada.** No hay CLI ni credenciales de Vercel en el entorno. Los pasos exactos de despliegue están en `prd/DESPLIEGUE.md`.
+**URL pública:** https://vehicle-care-web-production-c5e6.up.railway.app (Railway; detalle en `prd/DESPLIEGUE.md`).
 
 Ejecución local reproducible (requiere Node ≥ 24, pnpm y Docker):
 
@@ -117,13 +117,13 @@ La auditoría completa está en `prd/AUDITORIA_CONSISTENCIA.md` (14 diferencias,
 
 | Aspecto | Estado |
 |---|---|
-| **Despliegue** | **No desplegado; no hay URL.** El build es apto para Vercel: compila sin secretos ni base. Pasos exactos en `prd/DESPLIEGUE.md` |
+| **Despliegue** | Railway: https://vehicle-care-web-production-c5e6.up.railway.app. Claude real con tope de USD 5 / 24 h. Ver `prd/DESPLIEGUE.md` |
 | **LLM** | La **demo** usa `ScriptedLlm` (D1). El agente se evaluó con Claude real: **Fase 8A** con Sonnet 5.5 y Opus 5.5 (36 casos) **Fase 8B** con Sonnet 5.5 y prompt v5 (41 casos: **41/41**, 0 cifras inventadas, 0 reservas sin clic, 0 bloqueos de la guardia, p50 3,7 s) y **Fase 8C**, con la UI de punta a punta con Claude (A–D 4/4) y la reevaluación 41/41. El modelo por defecto es `claude-sonnet-5-5`. Gasto acumulado ≈ USD 6,8. Informes: `prd/reports/REPORT_FASE_8A.md`, `REPORT_FASE_8B.md` y `REPORT_FASE_8C.md`. La nota del PDF «no se ha validado un LLM real» quedó desactualizada: se puede actualizar si lo apruebas |
 | **Pruebas** | lint, typecheck, unitarias, integración, journeys, E2E y axe, build y migraciones en verde (`prd/reports/REPORT_FASE_7.md` §5; cierre en `prd/reports/REPORT_CIERRE.md`) |
 
 ## 9. Bloqueos que requieren intervención del usuario
 
-1. **Despliegue público:** cuenta de Vercel (`vercel login`), Postgres del Marketplace en plan gratuito y ejecución de `prd/DESPLIEGUE.md`. Mientras tanto, la demostración es local (`prd/GUIA_DEMO.md` §1) y puede grabarse con el guion de §3.
+1. **Despliegue público:** hecho en Railway (`prd/DESPLIEGUE.md`). Pendiente: autorizar la GitHub App de Railway para el despliegue automático desde `main`.
 2. **LLM real (opcional):** `ANTHROPIC_API_KEY` y aprobación de presupuesto (USD 5–10) para `EVAL_LLM=anthropic EVAL_BUDGET_USD=… pnpm eval:agent`. Hasta entonces, D1 y D2 rigen.
 3. **Antes de clientes reales (no para la evaluación):** aprobación del protocolo de seguridad por un responsable técnico (D6) y las dependencias de integración de §4.1 (D4).
 4. **Grabación del video:** la debe hacer una persona; no hay URL ni video generados.

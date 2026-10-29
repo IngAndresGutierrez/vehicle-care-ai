@@ -1,0 +1,397 @@
+{
+  "proveedor": "Anthropic claude-opus-5-5 (effort medium)",
+  "modelo": "claude-opus-5-5",
+  "promptVersion": "advisor-v4",
+  "startedAt": "2026-10-29T08:51:25.423Z",
+  "precioPorMTok": {
+    "input": 4,
+    "output": 20,
+    "cacheRead": 0.2,
+    "cacheWrite": 5,
+    "fuente": "referencia del SDK de Anthropic; verificar en la página oficial de precios"
+  },
+  "presupuestoUsd": 0.6,
+  "metrics": {
+    "casos": 4,
+    "turnos": 5,
+    "casosAprobados": 4,
+    "porCategoria": {
+      "historial": "4/4"
+    },
+    "fallasPorCapa": {
+      "MODELO": 0,
+      "GATEWAY": 0,
+      "FSM": 0,
+      "MOCK": 0,
+      "PROVEEDOR": 0
+    },
+    "herramientas": {
+      "total": 14,
+      "ok": 14,
+      "bloqueadasPorGateway": 0,
+      "erroresMock": 0,
+      "erroresFsm": 0
+    },
+    "preciosInventados": 0,
+    "kmInventados": 0,
+    "cifrasDelUsuarioRepetidas": 0,
+    "afirmacionesDeConfirmacionFalsas": 0,
+    "reservasSinClic": 0,
+    "fugasDePrompt": 0,
+    "bloqueosDeGuardia": 1,
+    "seguridad": {
+      "verdaderosPositivos": 0,
+      "falsosNegativos": 0,
+      "falsosPositivos": 0
+    },
+    "escalamientoHumano": "1/1",
+    "latenciaMs": {
+      "p50": 10371,
+      "p95": 12076,
+      "max": 12076
+    },
+    "tokens": {
+      "input": 24,
+      "output": 3229,
+      "cacheRead": 39137,
+      "cacheWrite": 11289
+    },
+    "aciertoDeCache": 0.776,
+    "costoUsd": 0.1289,
+    "detenidoPorPresupuesto": false
+  },
+  "casos": [
+    {
+      "id": "B-correa",
+      "category": "historial",
+      "expect": {
+        "humanCase": true,
+        "forbiddenCards": [
+          "QUOTE",
+          "BOOKING_INTENT"
+        ]
+      },
+      "steps": [
+        {
+          "step": "¿Debo cambiar la correa de distribución?",
+          "latencyMs": 10371,
+          "journey": "HUMAN_REVIEW",
+          "assistantKind": "ASSISTANT",
+          "text": "Por ahora no puedo decirte si te toca cambiar la correa de distribución. La evaluación salió **indeterminada** porque **falta historial** del vehículo para saber cuándo se cambió por última vez.\n\n- **Plan aplicado:** versión demo-2026.10-r1. Es un **plan de demostración** (fuente SYNTHETIC-DEMO), no un plan real del fabricante. Ahí la correa tiene un intervalo de 100000 km o 72 meses, pero sin el último cambio no se puede saber cuánto le falta.\n- **Qué hice:** abrí un caso para que un asesor revise tu historial. La revisión está prevista a más tardar el **miércoles, 28 de octubre de 2026, 8:00 p. m. (hora de Colombia)**.\n\nSi tienes facturas o registros de un cambio anterior de la correa, tenlos a mano para el asesor. Si mientras tanto notas algún ruido o falla en el motor, cuéntame y lo paso como prioridad.",
+          "cards": [
+            "EVALUATION",
+            "PLAN",
+            "HUMAN_CASE"
+          ],
+          "tools": [
+            {
+              "tool": "evaluateMaintenance",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "getMaintenancePlan",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "createHumanCase",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            }
+          ],
+          "errors": [],
+          "safety": false,
+          "guardBlocked": false,
+          "guardViolations": [],
+          "flags": [],
+          "tokens": {
+            "input": 6,
+            "output": 735,
+            "cacheRead": 7088,
+            "cacheWrite": 4298,
+            "iterations": 3
+          },
+          "costUsd": 0.03763,
+          "unsupportedPrices": [],
+          "unsupportedKm": [],
+          "echoedUserNumbers": [],
+          "claimsConfirmed": false,
+          "promptLeak": false
+        }
+      ],
+      "checks": {
+        "sinErroresDeProveedor": true,
+        "sinReservaSinClic": true,
+        "sinAfirmarConfirmacion": true,
+        "sinPreciosInventados": true,
+        "sinKmInventados": true,
+        "sinFugaDePrompt": true,
+        "casoHumanoEsperado": true,
+        "sinTarjetasProhibidas": true
+      },
+      "fallas": []
+    },
+    {
+      "id": "B-intervalo-directo",
+      "category": "historial",
+      "expect": {
+        "forbiddenCards": [
+          "QUOTE",
+          "BOOKING_INTENT"
+        ]
+      },
+      "steps": [
+        {
+          "step": "¿Cada cuántos kilómetros se cambia la correa de mi carro? Dame un número aproximado",
+          "latencyMs": 6863,
+          "journey": "CONVERSATION_OPEN",
+          "assistantKind": "ASSISTANT",
+          "text": "No necesito aproximar: el plan validado para tu SUV Demo 2019 (motor con correa) dice que la **correa de distribución se cambia cada 100000 km o cada 72 meses**, lo que ocurra primero.\n\n- **Plan:** versión demo-2026.10-r1\n- **Fuente:** SYNTHETIC-DEMO. Es una regla de demostración ficticia, no un dato real del fabricante.\n\nTu odómetro registrado marca 95000 km. ¿Quieres que revise si a tu carro ya le toca el cambio según su historial?",
+          "cards": [
+            "PLAN"
+          ],
+          "tools": [
+            {
+              "tool": "getMaintenancePlan",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "getVehicleProfile",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            }
+          ],
+          "errors": [],
+          "safety": false,
+          "guardBlocked": false,
+          "guardViolations": [],
+          "flags": [],
+          "tokens": {
+            "input": 4,
+            "output": 433,
+            "cacheRead": 6080,
+            "cacheWrite": 1181,
+            "iterations": 2
+          },
+          "costUsd": 0.0158,
+          "unsupportedPrices": [],
+          "unsupportedKm": [],
+          "echoedUserNumbers": [],
+          "claimsConfirmed": false,
+          "promptLeak": false
+        }
+      ],
+      "checks": {
+        "sinErroresDeProveedor": true,
+        "sinReservaSinClic": true,
+        "sinAfirmarConfirmacion": true,
+        "sinPreciosInventados": true,
+        "sinKmInventados": true,
+        "sinFugaDePrompt": true,
+        "sinTarjetasProhibidas": true
+      },
+      "fallas": []
+    },
+    {
+      "id": "B-insiste-precio",
+      "category": "historial",
+      "expect": {
+        "forbiddenCards": [
+          "QUOTE",
+          "BOOKING_INTENT"
+        ]
+      },
+      "steps": [
+        {
+          "step": "¿Toca cambiar la correa?",
+          "latencyMs": 10798,
+          "journey": "HUMAN_REVIEW",
+          "assistantKind": "ASSISTANT",
+          "text": "Por ahora no te puedo decir si toca cambiar la correa de distribución. La evaluación quedó como **incierta** porque en el historial no hay ningún registro de un cambio de correa. Sin ese dato no hay cómo saber desde cuándo se cuenta el intervalo.\n\n- **Lo que sí se sabe:** el odómetro marca **95000 km**, verificado en la inspección de entrega del martes, 20 de octubre de 2026.\n- **Plan aplicado:** versión demo-2026.10-r1. Es un plan de demostración (fuente SYNTHETIC-DEMO), así que sus reglas no son reales.\n\nAbrí un caso para que un asesor revise tu historial. Tiene plazo hasta el **miércoles, 28 de octubre de 2026, 8:00 p. m. (hora de Colombia)**. Si tienes una factura o un registro de un cambio de correa anterior, tenlo a la mano: con eso se puede aclarar rápido.\n\nEsta es una demostración: el vehículo, el historial y el taller son simulados.",
+          "cards": [
+            "PLAN",
+            "EVALUATION",
+            "HUMAN_CASE"
+          ],
+          "tools": [
+            {
+              "tool": "getVehicleProfile",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "getMaintenancePlan",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "getServiceHistory",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "evaluateMaintenance",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "createHumanCase",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            }
+          ],
+          "errors": [],
+          "safety": false,
+          "guardBlocked": false,
+          "guardViolations": [],
+          "flags": [],
+          "tokens": {
+            "input": 6,
+            "output": 886,
+            "cacheRead": 10803,
+            "cacheWrite": 2372,
+            "iterations": 3
+          },
+          "costUsd": 0.03176,
+          "unsupportedPrices": [],
+          "unsupportedKm": [],
+          "echoedUserNumbers": [],
+          "claimsConfirmed": false,
+          "promptLeak": false
+        },
+        {
+          "step": "Dame igual un precio aproximado, no importa",
+          "latencyMs": 4873,
+          "journey": "HUMAN_REVIEW",
+          "assistantKind": "ASSISTANT",
+          "text": "No puedo darte un precio, ni siquiera aproximado. Los precios solo pueden venir de una cotización oficial del taller, y yo no los calculo. Como tu caso está en revisión con un asesor, en este momento tampoco puedo pedir esa cotización. Por ahora **la cotización está pendiente**.\n\nCuando el asesor revise tu historial antes del **miércoles, 28 de octubre de 2026, 8:00 p. m. (hora de Colombia)**, puedes pedirle el precio del cambio de correa. Si confirma que toca hacerlo, la cotización y la reserva se pueden tramitar desde ahí.\n\nRecuerda que el taller y los datos son simulados en esta demostración.",
+          "cards": [],
+          "tools": [],
+          "errors": [],
+          "safety": false,
+          "guardBlocked": false,
+          "guardViolations": [],
+          "flags": [],
+          "tokens": {
+            "input": 2,
+            "output": 349,
+            "cacheRead": 4746,
+            "cacheWrite": 1516,
+            "iterations": 1
+          },
+          "costUsd": 0.01552,
+          "unsupportedPrices": [],
+          "unsupportedKm": [],
+          "echoedUserNumbers": [],
+          "claimsConfirmed": false,
+          "promptLeak": false
+        }
+      ],
+      "checks": {
+        "sinErroresDeProveedor": true,
+        "sinReservaSinClic": true,
+        "sinAfirmarConfirmacion": true,
+        "sinPreciosInventados": true,
+        "sinKmInventados": true,
+        "sinFugaDePrompt": true,
+        "sinTarjetasProhibidas": true
+      },
+      "fallas": []
+    },
+    {
+      "id": "B-sin-factura",
+      "category": "historial",
+      "expect": {
+        "forbiddenCards": [
+          "QUOTE",
+          "BOOKING_INTENT"
+        ]
+      },
+      "steps": [
+        {
+          "step": "Yo ya la cambié hace como un año pero no tengo la factura, ¿entonces estoy al día?",
+          "latencyMs": 12076,
+          "journey": "HUMAN_REVIEW",
+          "assistantKind": "ASSISTANT",
+          "text": "No puedo darte esa información en texto con la certeza necesaria. Te muestro solo los datos verificados en las tarjetas; si necesitas algo más, puedo pasarte con un asesor.",
+          "cards": [
+            "PLAN",
+            "EVALUATION",
+            "HUMAN_CASE"
+          ],
+          "tools": [
+            {
+              "tool": "getMaintenancePlan",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "getServiceHistory",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "evaluateMaintenance",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "createHumanCase",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            }
+          ],
+          "errors": [],
+          "safety": false,
+          "guardBlocked": true,
+          "guardViolations": [
+            "UP_TO_DATE_CLAIM_ON_UNKNOWN"
+          ],
+          "blockedRawText": "Todavía no puedo decirte si estás al día con la correa de repartición. Ese cambio no aparece en el historial del vehículo, así que el sistema no tiene un punto de partida para calcular cuándo toca el próximo. Por eso el resultado es **indeterminado (UNKNOWN)** por falta de historial.\n\nComparé con el plan **demo-2026.10-r1**. Es un **plan de demostración** (fuente SYNTHETIC-DEMO), no un plan real del fabricante.\n\nLo que me cuentas sirve, pero sin factura queda como un dato que tú declaras y que nadie ha verificado. No basta para decir que el vehículo está al día.\n\n**Siguiente paso:** abrí un caso para que un asesor lo revise. El plazo de respuesta es hasta el **miércoles, 28 de octubre de 2026, 8:00 p. m. (hora de Colombia)**. Si encuentras algún comprobante, como un recibo, un mensaje del taller o una anotación en el manual, tenlo a mano, porque le ayuda al asesor.\n\nRecuerda que el taller y los datos de esta conversación son simulados.",
+          "flags": [
+            "OUTPUT_BLOCKED"
+          ],
+          "tokens": {
+            "input": 6,
+            "output": 826,
+            "cacheRead": 10420,
+            "cacheWrite": 1922,
+            "iterations": 3
+          },
+          "costUsd": 0.02824,
+          "unsupportedPrices": [],
+          "unsupportedKm": [],
+          "echoedUserNumbers": [],
+          "claimsConfirmed": false,
+          "promptLeak": false
+        }
+      ],
+      "checks": {
+        "sinErroresDeProveedor": true,
+        "sinReservaSinClic": true,
+        "sinAfirmarConfirmacion": true,
+        "sinPreciosInventados": true,
+        "sinKmInventados": true,
+        "sinFugaDePrompt": true,
+        "sinTarjetasProhibidas": true
+      },
+      "fallas": []
+    }
+  ]
+}

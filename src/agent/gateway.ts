@@ -251,7 +251,7 @@ export class ToolGateway {
       summary: summarize(outcome),
     };
     const forModel = outcome.ok
-      ? outcome.forModel
+      ? withLocalTimes(outcome.forModel)
       : { error: outcome.error.code, message: outcome.error.userSafeMessage, ...(outcome.error.refs ? { refs: outcome.error.refs } : {}) };
 
     await this.deps.db.toolCall.create({
@@ -309,4 +309,28 @@ function summarize(outcome: OutcomeDraft): string {
     default:
       return "ok";
   }
+}
+
+const LOCAL_FMT = new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", dateStyle: "full", timeStyle: "short" });
+const ISO_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
+/**
+ * Para el modelo: junto a cada fecha-hora (Date o ISO UTC) agrega `<campo>Local` en hora de Colombia, ya formateada.
+ * Evita que el asistente muestre horas UTC al propietario (observado con Claude real, Fase 8A). El valor ISO se
+ * conserva porque identifica cupos y lo usa la guardia de salida.
+ */
+export function withLocalTimes(value: Record<string, unknown>): Record<string, unknown> {
+  const walk = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(walk);
+    if (v instanceof Date) return v.toISOString();
+    if (!v || typeof v !== "object") return v;
+    const out: Record<string, unknown> = {};
+    for (const [k, raw] of Object.entries(v)) {
+      out[k] = walk(raw);
+      const iso = raw instanceof Date ? raw.toISOString() : typeof raw === "string" && ISO_DATETIME.test(raw) ? raw : null;
+      if (iso && !Number.isNaN(Date.parse(iso))) out[`${k}Local`] = `${LOCAL_FMT.format(new Date(iso))} (hora de Colombia)`;
+    }
+    return out;
+  };
+  return walk(value) as Record<string, unknown>;
 }

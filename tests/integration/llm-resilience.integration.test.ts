@@ -66,3 +66,52 @@ describe("Proveedor caído DESPUÉS de ejecutar herramientas", () => {
     expect(["NEED_DETECTED", "CONVERSATION_OPEN"]).toContain((await findJourney(db, { vehicleId: V.v1, serviceCode: OIL }))?.state ?? before);
   });
 });
+
+/** Modelo de prueba: cotiza en los dos talleres en el mismo turno y cita ambos totales (comportamiento observado en Claude). */
+class QuotesBoth implements LlmPort {
+  readonly info = { provider: "SCRIPTED" as const, model: "quotes-both (prueba)", simulated: true };
+  async complete(req: LlmRequest): Promise<LlmResponse> {
+    const last = req.messages.at(-1);
+    const results = last?.role === "user" ? last.content.filter((b) => b.type === "tool_result") : [];
+    if (results.length === 0) {
+      return { stopReason: "tool_use", content: [{ type: "tool_use", id: "q1", name: "getQuote", input: { workshopId: "ws-demo-t1" } }, { type: "tool_use", id: "q2", name: "getQuote", input: { workshopId: "ws-demo-t2" } }], usage: { inputTokens: 1, outputTokens: 1 }, servedBy: this.info.model };
+    }
+    const totals = results.map((b) => (b.type === "tool_result" ? (JSON.parse(b.content) as { totalCop?: number }).totalCop : undefined)).filter((n): n is number => typeof n === "number");
+    const fmt = (n: number) => `$${n.toLocaleString("es-CO")}`;
+    return { stopReason: "end_turn", content: [{ type: "text", text: `Taller Norte: ${fmt(totals[0])}. Taller Sur: ${fmt(totals[1])}.` }], usage: { inputTokens: 1, outputTokens: 1 }, servedBy: this.info.model };
+  }
+}
+
+describe("Guardia de salida con varias herramientas en el mismo turno", () => {
+  it("acepta cifras de dos cotizaciones devueltas en este turno (antes era un falso positivo) y sigue bloqueando cifras inventadas", async () => {
+    const r1 = await say(db, OWNER_C1, V.v1, "¿Qué mantenimiento le toca a mi carro?");
+    const r2 = await say(db, OWNER_C1, V.v1, "¿Cuánto cuesta en cada taller?", { sessionId: r1.sessionId, llm: new QuotesBoth() });
+    expect(r2.trace.toolCalls.filter((t) => t.tool === "getQuote" && t.ok)).toHaveLength(2);
+    expect(r2.trace.guard.blocked).toBe(false);
+    expect(r2.assistant.text).toMatch(/Taller Norte: \$[\d.]+\. Taller Sur: \$[\d.]+\./);
+
+    const liar: LlmPort = { info: { provider: "SCRIPTED", model: "liar (prueba)", simulated: true }, complete: async () => ({ stopReason: "end_turn", content: [{ type: "text", text: "Te sale en $99.000." }], usage: { inputTokens: 1, outputTokens: 1 }, servedBy: "liar" }) };
+    const r3 = await say(db, OWNER_C1, V.v1, "¿Y más barato?", { sessionId: r2.sessionId, llm: liar });
+    expect(r3.trace.guard.blocked).toBe(true);
+    expect(r3.assistant.text).not.toContain("99.000");
+  });
+});
+
+describe("Sesiones ante cambios de prompt o de modelo real", () => {
+  it("si la sesión se creó con otra versión del prompt, abre una sesión nueva en vez de reenviar un historial incompatible", async () => {
+    const r1 = await say(db, OWNER_C1, V.v1, "¿Qué mantenimiento le toca a mi carro?");
+    await db.conversationSession.update({ where: { id: r1.sessionId }, data: { promptVersion: "advisor-v0" } });
+    const r2 = await say(db, OWNER_C1, V.v1, "¿Cuánto cuesta?", { sessionId: r1.sessionId });
+    expect(r2.sessionId).not.toBe(r1.sessionId);
+    expect((await db.conversationSession.findUniqueOrThrow({ where: { id: r2.sessionId } })).promptVersion).not.toBe("advisor-v0");
+  });
+
+  it("si cambia el modelo real (p. ej. Sonnet → Opus), también abre una sesión nueva; con modelos simulados no", async () => {
+    const real = (model: string): LlmPort => ({ info: { provider: "ANTHROPIC", model, simulated: false }, complete: (req) => new ScriptedLlm().complete(req) });
+    const a = await say(db, OWNER_C1, V.v1, "¿Qué mantenimiento le toca a mi carro?", { llm: real("claude-sonnet-5-5") });
+    const b = await say(db, OWNER_C1, V.v1, "¿Cuánto cuesta?", { sessionId: a.sessionId, llm: real("claude-sonnet-5-5") });
+    expect(b.sessionId).toBe(a.sessionId);
+    const c = await say(db, OWNER_C1, V.v1, "¿Qué horarios hay?", { sessionId: b.sessionId, llm: real("claude-opus-5-5") });
+    expect(c.sessionId).not.toBe(b.sessionId);
+  });
+});

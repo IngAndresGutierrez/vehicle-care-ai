@@ -99,15 +99,20 @@ export class MaintenanceAdvisor {
     if (!access.ok) return err({ status: 403, code: "UNAUTHORIZED", message: "No tienes acceso a ese vehículo." });
 
     // ── Sesión: siempre del mismo propietario, vehículo y servicio ──
-    const session = input.sessionId
-      ? await db.conversationSession.findUnique({ where: { id: input.sessionId } })
-      : await db.conversationSession.create({
-          data: { vehicleId: input.vehicleId, actorId: input.owner.actorId, customerId: input.owner.customerId, serviceCode, memory: {}, promptVersion: ADVISOR_PROMPT_VERSION, model: llm.info.model },
-        });
+    const newSession = () =>
+      db.conversationSession.create({
+        data: { vehicleId: input.vehicleId, actorId: input.owner.actorId, customerId: input.owner.customerId, serviceCode, memory: {}, promptVersion: ADVISOR_PROMPT_VERSION, model: llm.info.model },
+      });
+    let session = input.sessionId ? await db.conversationSession.findUnique({ where: { id: input.sessionId } }) : await newSession();
     if (!session) return err({ status: 404, code: "SESSION_NOT_FOUND", message: "La sesión no existe." });
     if (session.actorId !== input.owner.actorId || session.vehicleId !== input.vehicleId || session.serviceCode !== serviceCode) {
       return err({ status: 403, code: "SESSION_MISMATCH", message: "La sesión no corresponde a este propietario, vehículo o servicio." });
     }
+    // Los bloques de pensamiento quedan ligados al modelo y al prefijo (system + herramientas) que los produjo: si cambió
+    // la versión del prompt o el modelo (p. ej. tras un despliegue), se abre una sesión nueva en vez de reenviar un
+    // historial que el proveedor rechazaría o descartaría. La respuesta lleva el nuevo sessionId.
+    // Solo aplica a modelos reales: los simulados no producen bloques de pensamiento.
+    if (session.promptVersion !== ADVISOR_PROMPT_VERSION || (!llm.info.simulated && session.model !== llm.info.model)) session = await newSession();
     if (session.status !== "ACTIVE" || session.turnCount >= this.limits.maxTurnsPerSession) return err({ status: 409, code: "SESSION_CLOSED", message: "La sesión terminó; inicia una nueva." });
 
     const ctx: AgentSessionContext = {
@@ -413,6 +418,13 @@ export class MaintenanceAdvisor {
           addDate(r.observedAt);
         }
       }
+      // Cifras devueltas por herramientas EN ESTE TURNO (p. ej. dos cotizaciones o dos agendas): respaldadas aunque la
+      // memoria conserve solo la última como vigente. Corrige falsos positivos observados con Claude (Fase 8A).
+      if (o.tool === "getQuote") {
+        [d.subtotalCop, d.taxCop, d.totalCop].forEach((n) => typeof n === "number" && amounts.add(n));
+        addDate(d.validUntil);
+      }
+      if (o.tool === "getAvailableSlots") for (const sl of (d.slots as Array<{ startsAt: Date | string }>) ?? []) addDate(sl.startsAt);
       if (o.tool === "prepareBooking") {
         const s = d.summary as { startsAt: Date; totalCop: number; taxCop: number };
         addDate(s.startsAt);

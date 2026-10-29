@@ -65,7 +65,15 @@ tests/evals/                    pruebas con el LLM real (se omiten sin ANTHROPIC
 ## Agente (Fase 5)
 
 - `LLM_PROVIDER=scripted` (por defecto): **simulación determinista por reglas, no IA generativa**; no requiere API key.
-- `LLM_PROVIDER=anthropic`: Claude vía SDK oficial (`LLM_MODEL`, por defecto `claude-opus-5-5`); requiere `ANTHROPIC_API_KEY`.
+- `LLM_PROVIDER=anthropic`: Claude vía SDK oficial; requiere `ANTHROPIC_API_KEY` (solo en `.env`, nunca en el repositorio).
+  - `LLM_MODEL`: por defecto `claude-opus-5-5`. **Recomendado tras la evaluación de la Fase 8A: `claude-sonnet-5-5`.**
+  - `LLM_EFFORT`: por defecto `medium`.
+  - `LLM_PROMPT_CACHE`: activado por defecto.
+- **Evaluación con Claude real (gasta créditos; requiere aprobación):**
+  - `EVAL_LLM=anthropic EVAL_BUDGET_USD=<tope> EVAL_MODELS=claude-sonnet-5-5,claude-opus-5-5 pnpm eval:agent` corre los 36 casos y se detiene al alcanzar el tope. `EVAL_SMOKE=1` corre solo 3 casos.
+  - Pruebas en vivo: `RUN_LIVE_LLM_EVALS=1 pnpm test:evals`. Sin esa variable se omiten, aunque la key exista.
+  - Resultados en `prd/reports/REPORT_FASE_8A.md`.
+- Para validar la app en local sin costo: `LLM_PROVIDER=scripted pnpm start`.
 - API: `POST /api/agent/turn`, `POST /api/bookings/confirm`, `POST /api/demo/session` (solo `DEMO_MODE=true`). Contratos en `prd/PHASE6_HANDOFF.md`.
 
 ## Demo navegable (Fase 6)

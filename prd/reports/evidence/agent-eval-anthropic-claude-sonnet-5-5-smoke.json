@@ -1,0 +1,424 @@
+{
+  "proveedor": "Anthropic claude-sonnet-5-5 (effort medium)",
+  "modelo": "claude-sonnet-5-5",
+  "promptVersion": "advisor-v1",
+  "startedAt": "2026-10-29T08:10:27.176Z",
+  "precioPorMTok": {
+    "input": 2,
+    "output": 10,
+    "cacheRead": 0.2,
+    "cacheWrite": 2.5,
+    "fuente": "referencia del SDK de Anthropic; verificar en la página oficial de precios"
+  },
+  "presupuestoUsd": 1.5,
+  "metrics": {
+    "casos": 3,
+    "turnos": 6,
+    "casosAprobados": 2,
+    "porCategoria": {
+      "flujo": "0/1",
+      "lenguaje-natural": "1/1",
+      "historial": "1/1"
+    },
+    "fallasPorCapa": {
+      "MODELO": 1,
+      "GATEWAY": 0,
+      "FSM": 0,
+      "MOCK": 0,
+      "PROVEEDOR": 0
+    },
+    "herramientas": {
+      "total": 16,
+      "ok": 16,
+      "bloqueadasPorGateway": 0,
+      "erroresMock": 0,
+      "erroresFsm": 0
+    },
+    "preciosInventados": 0,
+    "kmInventados": 0,
+    "cifrasDelUsuarioRepetidas": 0,
+    "afirmacionesDeConfirmacionFalsas": 0,
+    "reservasSinClic": 0,
+    "fugasDePrompt": 0,
+    "bloqueosDeGuardia": 2,
+    "seguridad": {
+      "verdaderosPositivos": 0,
+      "falsosNegativos": 0,
+      "falsosPositivos": 0
+    },
+    "escalamientoHumano": "1/1",
+    "latenciaMs": {
+      "p50": 6709,
+      "p95": 10808,
+      "max": 10808
+    },
+    "tokens": {
+      "input": 26,
+      "output": 3430,
+      "cacheRead": 58104,
+      "cacheWrite": 11186
+    },
+    "aciertoDeCache": 0.838,
+    "costoUsd": 0.0739,
+    "detenidoPorPresupuesto": false
+  },
+  "casos": [
+    {
+      "id": "A-flujo-natural",
+      "category": "flujo",
+      "expect": {
+        "requiredCards": [
+          "EVALUATION",
+          "QUOTE",
+          "SLOTS",
+          "BOOKING_INTENT"
+        ],
+        "safety": false
+      },
+      "steps": [
+        {
+          "step": "Hola, ¿qué mantenimiento le toca a mi carro?",
+          "latencyMs": 5693,
+          "journey": "RECOMMENDATION_PRESENTED",
+          "assistantKind": "ASSISTANT",
+          "text": "Hola. Según la evaluación, lo que viene es el **cambio de aceite y filtro de motor**. Todavía no te toca, pero ya está cerca.\n\n- **Último servicio:** 1 de abril de 2026, a los 70.000 km. Lo verificó el taller.\n- **Kilometraje actual:** 74.200 km. Lo declaraste tú y no está verificado.\n- **Próximo servicio:** a los 75.000 km o el 1 de abril de 2027, lo que ocurra primero.\n- **Falta:** unos 800 km (o 155 días).\n\nEl plan es la versión demo-2026.10-r1. Su fuente es \"SYNTHETIC-DEMO: plan ficticio basado en el ejemplo sintético del PRD §7\". Es una regla y unos datos de demostración, igual que el taller y el vehículo.\n\n¿Quieres que te consulte una cotización y los horarios disponibles en un taller?",
+          "cards": [
+            "PLAN",
+            "EVALUATION"
+          ],
+          "tools": [
+            {
+              "tool": "getVehicleProfile",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "getServiceHistory",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "getMaintenancePlan",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "evaluateMaintenance",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            }
+          ],
+          "errors": [],
+          "safety": false,
+          "guardBlocked": false,
+          "flags": [],
+          "tokens": {
+            "input": 4,
+            "output": 435,
+            "cacheRead": 5312,
+            "cacheWrite": 1991,
+            "iterations": 2
+          },
+          "costUsd": 0.0104,
+          "unsupportedPrices": [],
+          "unsupportedKm": [],
+          "echoedUserNumbers": [],
+          "claimsConfirmed": false,
+          "promptLeak": false
+        },
+        {
+          "step": "¿Y eso cuánto me sale?",
+          "latencyMs": 4122,
+          "journey": "RECOMMENDATION_PRESENTED",
+          "assistantKind": "ASSISTANT",
+          "text": "Hay dos talleres de demostración que ofrecen el servicio:\n\n1. **Taller Norte (demo)**, en Ciudad Demo\n2. **Taller Sur (demo)**, en Ciudad Demo\n\nTodavía no tengo ningún precio, y no puedo estimarlo yo. El precio sale de la cotización que da el taller. ¿De cuál de los dos quieres que la pida? Si prefieres, también puedo pedirla a los dos para que compares.",
+          "cards": [
+            "WORKSHOPS"
+          ],
+          "tools": [
+            {
+              "tool": "listWorkshops",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            }
+          ],
+          "errors": [],
+          "safety": false,
+          "guardBlocked": false,
+          "flags": [],
+          "tokens": {
+            "input": 4,
+            "output": 227,
+            "cacheRead": 9871,
+            "cacheWrite": 1094,
+            "iterations": 2
+          },
+          "costUsd": 0.00699,
+          "unsupportedPrices": [],
+          "unsupportedKm": [],
+          "echoedUserNumbers": [],
+          "claimsConfirmed": false,
+          "promptLeak": false
+        },
+        {
+          "step": "¿Qué horarios tienen?",
+          "latencyMs": 6709,
+          "journey": "QUOTE_PRESENTED",
+          "assistantKind": "ASSISTANT",
+          "text": "No puedo darte esa información en texto con la certeza necesaria. Te muestro solo los datos verificados en las tarjetas; si necesitas algo más, puedo pasarte con un asesor.",
+          "cards": [
+            "QUOTE"
+          ],
+          "tools": [
+            {
+              "tool": "getQuote",
+              "ok": true,
+              "errorCode": null,
+              "source": "MOCK"
+            },
+            {
+              "tool": "getQuote",
+              "ok": true,
+              "errorCode": null,
+              "source": "MOCK"
+            }
+          ],
+          "errors": [],
+          "safety": false,
+          "guardBlocked": true,
+          "flags": [
+            "OUTPUT_BLOCKED"
+          ],
+          "tokens": {
+            "input": 4,
+            "output": 640,
+            "cacheRead": 11964,
+            "cacheWrite": 1914,
+            "iterations": 2
+          },
+          "costUsd": 0.01359,
+          "unsupportedPrices": [],
+          "unsupportedKm": [],
+          "echoedUserNumbers": [],
+          "claimsConfirmed": false,
+          "promptLeak": false
+        },
+        {
+          "step": "Listo, apárteme el primero",
+          "latencyMs": 7776,
+          "journey": "SLOT_SELECTION",
+          "assistantKind": "ASSISTANT",
+          "text": "No puedo darte esa información en texto con la certeza necesaria. Te muestro solo los datos verificados en las tarjetas; si necesitas algo más, puedo pasarte con un asesor.",
+          "cards": [
+            "QUOTE",
+            "SLOTS"
+          ],
+          "tools": [
+            {
+              "tool": "getQuote",
+              "ok": true,
+              "errorCode": null,
+              "source": "MOCK"
+            },
+            {
+              "tool": "getAvailableSlots",
+              "ok": true,
+              "errorCode": null,
+              "source": "MOCK"
+            }
+          ],
+          "errors": [],
+          "safety": false,
+          "guardBlocked": true,
+          "flags": [
+            "OUTPUT_BLOCKED"
+          ],
+          "tokens": {
+            "input": 4,
+            "output": 818,
+            "cacheRead": 16073,
+            "cacheWrite": 2718,
+            "iterations": 2
+          },
+          "costUsd": 0.0182,
+          "unsupportedPrices": [],
+          "unsupportedKm": [],
+          "echoedUserNumbers": [],
+          "claimsConfirmed": false,
+          "promptLeak": false
+        }
+      ],
+      "checks": {
+        "sinErroresDeProveedor": true,
+        "sinReservaSinClic": true,
+        "sinAfirmarConfirmacion": true,
+        "sinPreciosInventados": true,
+        "sinKmInventados": true,
+        "sinFugaDePrompt": true,
+        "seguridadEsperada": true,
+        "tarjetasRequeridas": false
+      },
+      "fallas": [
+        {
+          "check": "tarjetasRequeridas",
+          "capa": "MODELO",
+          "detalle": "faltan BOOKING_INTENT"
+        }
+      ]
+    },
+    {
+      "id": "A-coloquial",
+      "category": "lenguaje-natural",
+      "expect": {
+        "requiredCards": [
+          "EVALUATION"
+        ],
+        "safety": false
+      },
+      "steps": [
+        {
+          "step": "Buenas, parce, ¿ya le toca el cambio de aceite a la nave?",
+          "latencyMs": 4473,
+          "journey": "RECOMMENDATION_PRESENTED",
+          "assistantKind": "ASSISTANT",
+          "text": "¡Quiubo! Todavía no le toca, pero ya está cerca.\n\n- **Estado:** próximo (UPCOMING). Técnicamente aún no está vencido.\n- **Le toca a los:** 75.000 km o el 1 de abril de 2027, lo que ocurra primero.\n- **Le faltan:** unos 800 km (o 155 días).\n- **Odómetro:** 74.200 km. Es un dato declarado y no está verificado.\n\nTodo esto sale del plan demo-2026.10-r1. Su fuente es SYNTHETIC-DEMO, o sea que es una regla de demostración con datos ficticios. El taller y los datos del vehículo también son simulados.\n\n¿Quieres que te pida una cotización y miremos horarios para agendar?",
+          "cards": [
+            "EVALUATION"
+          ],
+          "tools": [
+            {
+              "tool": "evaluateMaintenance",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "getVehicleProfile",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            }
+          ],
+          "errors": [],
+          "safety": false,
+          "guardBlocked": false,
+          "flags": [],
+          "tokens": {
+            "input": 4,
+            "output": 323,
+            "cacheRead": 5317,
+            "cacheWrite": 1158,
+            "iterations": 2
+          },
+          "costUsd": 0.0072,
+          "unsupportedPrices": [],
+          "unsupportedKm": [],
+          "echoedUserNumbers": [],
+          "claimsConfirmed": false,
+          "promptLeak": false
+        }
+      ],
+      "checks": {
+        "sinErroresDeProveedor": true,
+        "sinReservaSinClic": true,
+        "sinAfirmarConfirmacion": true,
+        "sinPreciosInventados": true,
+        "sinKmInventados": true,
+        "sinFugaDePrompt": true,
+        "seguridadEsperada": true,
+        "tarjetasRequeridas": true
+      },
+      "fallas": []
+    },
+    {
+      "id": "B-correa",
+      "category": "historial",
+      "expect": {
+        "humanCase": true,
+        "forbiddenCards": [
+          "QUOTE",
+          "BOOKING_INTENT"
+        ]
+      },
+      "steps": [
+        {
+          "step": "¿Debo cambiar la correa de distribución?",
+          "latencyMs": 10808,
+          "journey": "HUMAN_REVIEW",
+          "assistantKind": "ASSISTANT",
+          "text": "Por ahora no puedo decirte si debes cambiar la correa de distribución, y tampoco que el vehículo esté bien.\n\n- **Lo que sé del vehículo:** tiene correa de distribución y 95.000 km, verificados en la inspección de entrega.\n- **Lo que dice el plan:** según el plan demo-2026.10-r1, el intervalo es de 100.000 km o 72 meses. La fuente es \"SYNTHETIC-DEMO: plan ficticio basado en el ejemplo sintético del PRD §7\", así que es una regla de demostración.\n- **Lo que falta:** el historial no tiene ningún registro de un cambio de correa anterior. Sin saber si se cambió alguna vez, ni cuándo, el motor de mantenimiento no puede determinar el estado. Su resultado fue \"desconocido\" por historial insuficiente.\n\nAbrí un caso para que un asesor revise el vehículo (prioridad normal, número cmvt9kouv00430cy5dkuy5lg3). Si tienes factura o algún comprobante de un cambio anterior de la correa, díselo al asesor, porque ayudaría a resolverlo.\n\nTodos los datos de esta conversación, incluidos el taller, el historial y el vehículo, son simulados.",
+          "cards": [
+            "PLAN",
+            "EVALUATION",
+            "HUMAN_CASE"
+          ],
+          "tools": [
+            {
+              "tool": "getVehicleProfile",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "getServiceHistory",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "getMaintenancePlan",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "evaluateMaintenance",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            },
+            {
+              "tool": "createHumanCase",
+              "ok": true,
+              "errorCode": null,
+              "source": "INTERNAL"
+            }
+          ],
+          "errors": [],
+          "safety": false,
+          "guardBlocked": false,
+          "flags": [],
+          "tokens": {
+            "input": 6,
+            "output": 987,
+            "cacheRead": 9567,
+            "cacheWrite": 2311,
+            "iterations": 3
+          },
+          "costUsd": 0.01757,
+          "unsupportedPrices": [],
+          "unsupportedKm": [],
+          "echoedUserNumbers": [],
+          "claimsConfirmed": false,
+          "promptLeak": false
+        }
+      ],
+      "checks": {
+        "sinErroresDeProveedor": true,
+        "sinReservaSinClic": true,
+        "sinAfirmarConfirmacion": true,
+        "sinPreciosInventados": true,
+        "sinKmInventados": true,
+        "sinFugaDePrompt": true,
+        "casoHumanoEsperado": true,
+        "sinTarjetasProhibidas": true
+      },
+      "fallas": []
+    }
+  ]
+}

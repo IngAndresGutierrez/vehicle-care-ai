@@ -77,3 +77,15 @@ describe("AnthropicLlm: errores transitorios y definitivos", () => {
     expect(r.stopReason).toBe("refusal");
   });
 });
+
+describe("Fechas para el modelo en hora de Colombia", () => {
+  it("agrega <campo>Local junto a cada fecha-hora y conserva el ISO original", async () => {
+    const { withLocalTimes } = await import("../gateway");
+    const out = withLocalTimes({ slots: [{ slotRef: "s1", startsAt: new Date("2026-10-29T13:00:00.000Z") }], validUntil: "2026-10-30T17:00:00.000Z", total: 333200 });
+    const slot = (out.slots as Array<Record<string, string>>)[0];
+    expect(slot.startsAt).toBe("2026-10-29T13:00:00.000Z");
+    expect(slot.startsAtLocal).toMatch(/29 de octubre de 2026.*8:00.*hora de Colombia/);
+    expect(out.validUntilLocal).toMatch(/30 de octubre de 2026.*12:00.*hora de Colombia/);
+    expect(out.total).toBe(333200);
+  });
+});

@@ -93,6 +93,26 @@ describe("OG — validador de salida", () => {
     }
   });
 
+  it("OG-03b negar, condicionar u ofrecer la reserva NO es afirmarla (falsos positivos observados con Claude, Fase 8A)", () => {
+    for (const t of [
+      "Ojo: la reserva no queda confirmada hasta que pulses «Confirmar reserva» en la tarjeta.",
+      "Todavía no está confirmada; para que quede reservada debes pulsar el botón.",
+      "¿Quieres que te reserve el primero de esos horarios?",
+      "Cuando confirmes, el taller emite un folio para tu cita.",
+      "Aún no tienes folio: lo recibirás cuando el taller confirme.",
+      // Textos reales de Claude Opus 5.5 bloqueados por error en la evaluación (Fase 8A):
+      "Dime cuál prefieres, por ejemplo «el primero», y preparo la solicitud de reserva. Para que quede reservado, tú debes pulsar **\"Confirmar reserva\"** y el taller debe emitir un folio.",
+      "La reserva solo existe cuando confirmas y el taller entrega un folio.",
+      "La cita solo queda reservada cuando pulses **\"Confirmar reserva\"** y el taller te dé un número de reserva (folio).",
+      "Esa solicitud todavía no reserva el turno: para eso tienes que pulsar **\"Confirmar reserva\"** y esperar a que el taller emita el folio.",
+    ]) {
+      expect(checkOutput(t, facts()).ok, t).toBe(true);
+    }
+    // Las afirmaciones siguen bloqueadas aunque el texto también tenga frases seguras.
+    expect(checkOutput("La reserva no queda confirmada hasta que pulses el botón. Listo, ya está confirmada tu cita.", facts()).ok).toBe(false);
+    for (const t of ["Tu cita quedó reservada para mañana a las 8.", "Tu folio es 48213.", "Listo: el número de reserva es 99."]) expect(checkOutput(t, facts()).ok, t).toBe(false);
+  });
+
   it("OG-04 los montos de la cotización vigente se permiten en cualquier formato", () => {
     expect(checkOutput("Total $333.200 (subtotal $280.000 más IVA $53.200)", facts())).toEqual({ ok: true });
     expect(checkOutput("Son 333200 COP", facts())).toEqual({ ok: true });

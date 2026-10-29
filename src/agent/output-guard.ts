@@ -47,11 +47,33 @@ const DMY_DATE_RE = /\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/g;
 const FOLIO_RE = /\bFOLIO-[A-Z0-9-]+\b/g;
 
 const BOOKING_CLAIMS = [
-  /\b(reserva|cita)\b.{0,30}\b(quedo|queda|esta|ha sido|fue)\b.{0,10}\b(confirmad|reservad|agendad)/,
-  /\b(ya )?(quedo|queda|esta) (reservad|agendad|confirmad)/,
-  /\b(te|le) (reserve|agende|confirme)\b/,
-  /\b(he|ya) (reservado|agendado|confirmado)\b/,
+  /\b(reserva|cita)\b.{0,30}\b(quedo|queda|esta|ha sido|fue)\b.{0,10}\b(confirmad|reservad|agendad)/g,
+  /\b(ya )?(quedo|queda|esta) (reservad|agendad|confirmad)/g,
+  /\b(te|le) (reserve|agende|confirme)\b/g,
+  /\b(he|ya) (reservado|agendado|confirmado)\b/g,
 ];
+
+/**
+ * Una mención de reserva o folio solo es afirmación si no está negada, condicionada ni ofrecida. Así pasan textos
+ * seguros que el prompt exige («la reserva NO queda confirmada hasta que pulses…», «¿quieres que te reserve el
+ * primero?», «el taller emite un folio cuando confirmes») y se siguen bloqueando las afirmaciones («ya está
+ * confirmada», «te agendé»). Falsos positivos observados con Claude real en la Fase 8A.
+ */
+const NEGATION_INSIDE = /\b(no|nunca|aun no|todavia no)\b/;
+const NON_ASSERTIVE_BEFORE =
+  /\b(no|nunca|aun no|todavia no|hasta que|cuando|si|quieres que|quieras que|deseas que|te gustaria que|puedo|podemos|para que|antes de que|una vez|despues de que|apenas|al confirmar|recibiras|recibes|tendras|emite|emitira|te dara|se genera|generara|te llegara)\b(\s+\S+){0,4}\s*$/;
+
+/** Condición que sigue al verbo en la misma oración: «la cita solo queda reservada CUANDO pulses…». */
+const CONDITION_AFTER = /^\s*(\S+\s+){0,3}(cuando|hasta que|si|una vez|despues de que|apenas|en cuanto)\b/;
+
+function assertive(sentence: string, index: number, matched: string): boolean {
+  if (NEGATION_INSIDE.test(matched)) return false;
+  if (CONDITION_AFTER.test(sentence.slice(index + matched.length))) return false;
+  return !NON_ASSERTIVE_BEFORE.test(sentence.slice(Math.max(0, index - 45), index));
+}
+
+/** Folio presentado como dato existente («tu folio es …», «número de reserva: 123»); mencionar el proceso no lo es. */
+const STATED_FOLIO = /\b(tu|su|el) (numero de reserva|folio)( de (tu )?(cita|reserva))? (es|sera|quedo)\b/g;
 const DIAGNOSIS = [/\b(el problema es|seguramente es|debe ser|es probable que sea|el diagnostico es)\b/];
 
 function collect(re: RegExp, text: string): string[] {
@@ -93,8 +115,15 @@ export function checkOutput(text: string, facts: GuardFacts): GuardResult {
 
   const normalized = normalizeText(text);
   if (!facts.bookingConfirmed) {
-    for (const re of BOOKING_CLAIMS) if (re.test(normalized)) flag("FALSE_BOOKING_CLAIM", re.source);
-    if (/\bfolio\b/.test(normalized) && facts.folios.size === 0) flag("FALSE_BOOKING_CLAIM", "folio");
+    // Por oración: la negación o condición de una frase no se extiende a la siguiente.
+    for (const sentence of text.split(/[.!?¡¿;:\n]+/).map(normalizeText).filter(Boolean)) {
+      for (const re of BOOKING_CLAIMS) {
+        for (const m of sentence.matchAll(re)) if (assertive(sentence, m.index ?? 0, m[0])) flag("FALSE_BOOKING_CLAIM", m[0]);
+      }
+      if (facts.folios.size === 0) {
+        for (const m of sentence.matchAll(STATED_FOLIO)) if (assertive(sentence, m.index ?? 0, m[0])) flag("FALSE_BOOKING_CLAIM", m[0]);
+      }
+    }
   }
   if (facts.evaluationUnknown && /\b(esta|estas|va|vas) al dia\b/.test(normalized)) flag("UP_TO_DATE_CLAIM_ON_UNKNOWN", "al dia");
   if (/\bcertific\w*/.test(normalized)) flag("CERTIFICATION_CLAIM", "certific");

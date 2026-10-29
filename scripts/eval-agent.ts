@@ -138,12 +138,14 @@ function allNumbers(value: unknown): Set<number> {
   JSON.stringify(value ?? null).replace(/-?\d+(?:\.\d+)?/g, (n) => (out.add(Math.round(Number(n))), n));
   return out;
 }
-/** Afirmación de reserva hecha o confirmada (ignora negaciones como «aún no está confirmada»). */
+/** Afirmación de reserva hecha o confirmada, por oración: ignora negaciones y condiciones previas en la misma oración. */
 function claimsConfirmed(text: string): boolean {
   const re = /\b(qued[oó]|est[aá]|ha sido|fue|tienes tu)\s+(?:tu\s+)?(?:cita\s+|reserva\s+)?(reservad[ao]|confirmad[ao]|agendad[ao])\b/gi;
-  for (const m of text.matchAll(re)) {
-    const before = text.slice(Math.max(0, (m.index ?? 0) - 18), m.index).toLowerCase();
-    if (!/\b(no|aún no|todavía no|aun no|todavia no|hasta que)\b/.test(before)) return true;
+  for (const sentence of text.split(/[.!?¡¿;:\n]+/)) {
+    for (const m of sentence.matchAll(re)) {
+      const before = sentence.slice(0, m.index).toLowerCase();
+      if (!/\b(no|nunca|aún no|todavía no|aun no|todavia no|hasta que|cuando|para que|si)\b/.test(before)) return true;
+    }
   }
   return false;
 }
@@ -183,6 +185,8 @@ interface StepLog {
   errors?: string[];
   safety?: boolean;
   guardBlocked?: boolean;
+  guardViolations?: string[];
+  blockedRawText?: string;
   flags?: string[];
   tokens?: { input: number; output: number; cacheRead: number; cacheWrite: number; iterations: number };
   costUsd?: number;
@@ -273,6 +277,15 @@ async function runModel(model: string, spentBefore: number): Promise<{ results: 
         const text = v.assistant.text;
         const prices = numbersIn(text, PRICE_RE).filter((n) => !allowed.has(n));
         const kms = numbersIn(text, KM_RE).filter((n) => !allowed.has(n));
+        // Solo evidencia de evaluación: si la guardia bloqueó, se recupera el texto crudo del modelo desde la
+        // transcripción (nunca llega al cliente) para poder diagnosticar falsos positivos.
+        let blockedRawText: string | undefined;
+        if (v.trace.guard.blocked) {
+          const sess = await db.conversationSession.findUnique({ where: { id: v.sessionId }, select: { transcript: true } });
+          const tr = (sess?.transcript as Array<{ role: string; content: Array<{ type: string; text?: string }> }> | null) ?? [];
+          const lastAssistant = [...tr].reverse().find((m) => m.role === "assistant" && m.content.some((b) => b.type === "text"));
+          blockedRawText = lastAssistant?.content.flatMap((b) => (b.type === "text" && b.text ? [b.text] : [])).join("\n");
+        }
         const l = v.trace.llm;
         const tokens = { input: l.inputTokens, output: l.outputTokens, cacheRead: l.cacheReadInputTokens ?? 0, cacheWrite: l.cacheCreationInputTokens ?? 0, iterations: l.iterations };
         const costUsd = price ? (tokens.input * price.input + tokens.output * price.output + tokens.cacheRead * price.cacheRead + tokens.cacheWrite * price.cacheWrite) / 1e6 : 0;
@@ -288,6 +301,8 @@ async function runModel(model: string, spentBefore: number): Promise<{ results: 
           errors: v.errors.map((e) => e.code),
           safety: v.trace.safety.triggered || v.cards.some((x) => x.type === "SAFETY"),
           guardBlocked: v.trace.guard.blocked,
+          guardViolations: v.trace.guard.violations,
+          ...(blockedRawText ? { blockedRawText } : {}),
           flags: v.trace.flags,
           tokens,
           costUsd: Number(costUsd.toFixed(5)),

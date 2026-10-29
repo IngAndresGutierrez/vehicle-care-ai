@@ -118,7 +118,7 @@ La auditoría completa está en `prd/AUDITORIA_CONSISTENCIA.md` (14 diferencias,
 | Aspecto | Estado |
 |---|---|
 | **Despliegue** | **No desplegado; no hay URL.** El build es apto para Vercel: compila sin secretos ni base. Pasos exactos en `prd/DESPLIEGUE.md` |
-| **LLM** | La **demo** usa `ScriptedLlm` (D1). **Fase 8A (29 oct):** el agente se evaluó con Claude real: Sonnet 5.5 y Opus 5.5, 36 casos. Resultados: 0 cifras inventadas, 0 reservas sin clic y 6/6 casos de seguridad; Opus 36/36 y Sonnet 35/36 (4/4 de historial con el prompt v4). Costo ≈ USD 5,2–5,5. Recomendación: Sonnet 5.5 (`prd/reports/REPORT_FASE_8A.md`). La nota del PDF «no se ha validado un LLM real» quedó desactualizada: se puede actualizar si lo apruebas |
+| **LLM** | La **demo** usa `ScriptedLlm` (D1). El agente se evaluó con Claude real: **Fase 8A** con Sonnet 5.5 y Opus 5.5 (36 casos) y **Fase 8B** con Sonnet 5.5 y prompt v5 (41 casos: **41/41**, 0 cifras inventadas, 0 reservas sin clic, 0 bloqueos de la guardia, p50 3,7 s). El modelo por defecto es `claude-sonnet-5-5`. Gasto acumulado ≈ USD 6. Informes: `prd/reports/REPORT_FASE_8A.md` y `REPORT_FASE_8B.md`. La nota del PDF «no se ha validado un LLM real» quedó desactualizada: se puede actualizar si lo apruebas |
 | **Pruebas** | lint, typecheck, unitarias, integración, journeys, E2E y axe, build y migraciones en verde (`prd/reports/REPORT_FASE_7.md` §5; cierre en `prd/reports/REPORT_CIERRE.md`) |
 
 ## 9. Bloqueos que requieren intervención del usuario

@@ -3,7 +3,7 @@ import { confirmBooking } from "@/application/booking/confirm-booking";
 import type { ActorContext } from "@/domain/policies/access-policy";
 import type { Container } from "../container";
 import { newTraceId } from "../ids";
-import { readCookie, SESSION_COOKIE, signSession, verifySession } from "../session";
+import { DEMO_RUNS_COOKIE, readCookie, SESSION_COOKIE, signSession, verifyDemoRuns, verifySession } from "../session";
 
 const MAX_BODY_BYTES = 8 * 1024;
 
@@ -86,8 +86,13 @@ export async function handleBookingConfirm(request: Request, c: Container): Prom
 }
 
 const DemoBody = z.object({ actorId: z.string().min(1).max(80) }).strict();
+const RUN_PERSONA = /^demo-([0-9a-f]{8})-(propietario|asesor)$/;
 
-/** POST /api/demo/session — sesión SIMULADA para la demo (solo con DEMO_MODE=true). */
+/**
+ * POST /api/demo/session — sesión SIMULADA para la demo (solo con DEMO_MODE=true). Solo permite entrar como las
+ * personas de una corrida iniciada desde este mismo navegador (cookie firmada `vc_demo_runs`); las personas fijas
+ * del seed solo con DEMO_SEED_PERSONAS=true (uso local). Cualquier otro caso responde 404 indistinto (ADR-020).
+ */
 export async function handleDemoSession(request: Request, c: Container): Promise<Response> {
   const traceId = newTraceId();
   if (!c.demoMode) return problem(404, "NOT_FOUND", "No disponible.", traceId);
@@ -95,7 +100,10 @@ export async function handleDemoSession(request: Request, c: Container): Promise
   if (!body.ok) return body.response;
   const parsed = DemoBody.safeParse(body.body);
   if (!parsed.success) return problem(400, "INVALID_REQUEST", "actorId requerido.", traceId);
-  const account = await c.db.actorAccount.findUnique({ where: { id: parsed.data.actorId } });
+  const runPersona = RUN_PERSONA.exec(parsed.data.actorId);
+  const myRuns = verifyDemoRuns(readCookie(request.headers.get("cookie"), DEMO_RUNS_COOKIE), c.sessionSecret, c.clock.now());
+  const allowed = runPersona ? myRuns.includes(runPersona[1]) : c.demoSeedPersonas;
+  const account = allowed ? await c.db.actorAccount.findUnique({ where: { id: parsed.data.actorId } }) : null;
   if (!account || !account.isDemo) return problem(404, "NOT_FOUND", "Persona demo inexistente.", traceId);
   const ttlSeconds = 8 * 3600;
   const token = signSession({ actorId: account.id, exp: Math.floor(c.clock.now().getTime() / 1000) + ttlSeconds }, c.sessionSecret);
@@ -105,4 +113,8 @@ export async function handleDemoSession(request: Request, c: Container): Promise
 
 export function sessionCookie(token: string, ttlSeconds: number): string {
   return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${ttlSeconds}${process.env.NODE_ENV === "production" ? "; Secure" : ""}`;
+}
+
+export function demoRunsCookie(token: string, ttlSeconds: number): string {
+  return `${DEMO_RUNS_COOKIE}=${token}; Path=/api/demo; HttpOnly; SameSite=Lax; Max-Age=${ttlSeconds}${process.env.NODE_ENV === "production" ? "; Secure" : ""}`;
 }

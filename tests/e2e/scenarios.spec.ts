@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openAssistant, openVehicleTab, say, shot, startScenario, switchPersona } from "./helpers";
+import { advisorOf, openAssistant, openVehicleTab, say, shot, startScenario, switchPersona } from "./helpers";
 
 test.describe("Escenarios de demo (ScriptedLlm, datos sintéticos)", () => {
   test("portada: selector de escenarios rotulado como simulación", async ({ page }, info) => {
@@ -60,7 +60,7 @@ test.describe("Escenarios de demo (ScriptedLlm, datos sintéticos)", () => {
     await expect(page.getByText("Cotización", { exact: true })).toHaveCount(0);
     await shot(page, info, "B1-caso-humano");
 
-    await switchPersona(page, "act-advisor", "/casos");
+    await switchPersona(page, advisorOf(vehicleId), "/casos");
     const card = page.getByRole("article").filter({ hasText: "Historial insuficiente" }).filter({ has: page.locator(`a[href^="/trazas/${vehicleId}"]`) });
     await expect(card).toBeVisible();
     await expect(card).toContainText("Tú");
@@ -84,7 +84,7 @@ test.describe("Escenarios de demo (ScriptedLlm, datos sintéticos)", () => {
     await expect(page.getByRole("heading", { name: "Reserva lista para confirmar" })).toHaveCount(0);
     await shot(page, info, "C1-seguridad");
 
-    await switchPersona(page, "act-advisor", "/casos");
+    await switchPersona(page, advisorOf(vehicleId), "/casos");
     const card = page.getByRole("article").filter({ hasText: "Síntoma de seguridad" }).filter({ has: page.locator(`a[href^="/trazas/${vehicleId}"]`) });
     await expect(card).toContainText("Prioridad urgente");
     await expect(card).toContainText("El asistente está detenido");

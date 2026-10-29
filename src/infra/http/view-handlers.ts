@@ -4,8 +4,8 @@ import { resolveHumanCase } from "@/application/resolve-human-case";
 import { getCasesInbox, getMe, getTraceView, getVehicleOverview } from "@/application/views/read-models";
 import type { Container } from "../container";
 import { newTraceId } from "../ids";
-import { signSession } from "../session";
-import { authenticate, json, problem, readJson, sessionCookie } from "./handlers";
+import { DEMO_RUNS_COOKIE, readCookie, signDemoRuns, signSession, verifyDemoRuns } from "../session";
+import { authenticate, demoRunsCookie, json, problem, readJson, sessionCookie } from "./handlers";
 
 const SERVICE = z.enum(["ENGINE_OIL_FILTER", "TIMING_BELT"]);
 const ID = z.string().min(1).max(80);
@@ -79,7 +79,6 @@ export async function handleDemoConfig(_request: Request, c: Container): Promise
     demoMode: c.demoMode,
     llm: c.llm.info,
     scenarios: c.demoMode ? Object.entries(DEMO_SCENARIOS).map(([key, s]) => ({ key, title: s.title, description: s.description, serviceCode: s.serviceCode, suggestedMessages: s.suggestedMessages })) : [],
-    staff: c.demoMode ? [{ actorId: "act-advisor", label: "Asesor de postventa (demo)" }] : [],
   });
 }
 
@@ -102,11 +101,21 @@ export async function handleDemoStart(request: Request, c: Container): Promise<R
   if (!body.ok) return body.response;
   const parsed = ScenarioBody.safeParse(body.body);
   if (!parsed.success) return problem(400, "INVALID_REQUEST", "Escenario inválido.", traceId);
+  // Tope global en la base: protege la demo pública aunque el limitador por IP (en memoria) no sea compartido.
+  const now = c.clock.now();
+  const today = await c.db.auditLog.count({ where: { action: "DEMO_RUN_STARTED", occurredAt: { gte: new Date(now.getTime() - 86_400_000) } } });
+  if (today >= c.demoRunsPerDay) return problem(429, "DEMO_DAILY_LIMIT", "La demo alcanzó su límite diario de corridas. Intenta mañana.", traceId);
   const run = await startDemoScenario(c, { scenario: parsed.data.scenario as DemoScenarioKey, traceId });
   if (!run.ok) return problem(409, run.error.code, "No fue posible preparar el escenario.", traceId);
   const ttl = 8 * 3600;
-  const token = signSession({ actorId: run.value.ownerActorId, exp: Math.floor(c.clock.now().getTime() / 1000) + ttl }, c.sessionSecret);
-  return json(200, { ...run.value, label: "Datos sintéticos de demostración" }, { "set-cookie": sessionCookie(token, ttl), "x-trace-id": traceId });
+  const exp = Math.floor(now.getTime() / 1000) + ttl;
+  const token = signSession({ actorId: run.value.ownerActorId, exp }, c.sessionSecret);
+  const previous = verifyDemoRuns(readCookie(request.headers.get("cookie"), DEMO_RUNS_COOKIE), c.sessionSecret, now);
+  const runs = signDemoRuns([run.value.runId, ...previous.filter((r) => r !== run.value.runId)], exp, c.sessionSecret);
+  const res = json(200, { ...run.value, label: "Datos sintéticos de demostración" }, { "x-trace-id": traceId });
+  res.headers.append("set-cookie", sessionCookie(token, ttl));
+  res.headers.append("set-cookie", demoRunsCookie(runs, ttl));
+  return res;
 }
 
 /** POST /api/demo/slot-taken — escenario D: otro cliente toma el cupo de MI intención pendiente (solo DEMO_MODE). */

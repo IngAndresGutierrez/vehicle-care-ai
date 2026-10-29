@@ -44,15 +44,30 @@ test.describe("Seguridad y errores", () => {
     await Promise.all([a.dispose(), b.dispose(), anon.dispose()]);
   });
 
-  test("el asesor no puede usar el asistente ni resolver un caso no asignado a él @api", async () => {
-    const adv = await pwRequest.newContext({ baseURL: base });
-    const owner = await pwRequest.newContext({ baseURL: base });
-    const run = await apiRun(owner, "A");
-    expect((await adv.post("/api/demo/session", { data: { actorId: "act-advisor" } })).status()).toBe(200);
-    expect((await adv.post("/api/agent/turn", { data: { vehicleId: run.vehicleId, message: "hola" } })).status()).toBe(403);
+  test("el asesor no puede usar el asistente ni resolver un caso ajeno @api", async () => {
+    const ctx = await pwRequest.newContext({ baseURL: base });
+    const run = await apiRun(ctx, "A");
+    expect((await ctx.post("/api/demo/session", { data: { actorId: run.advisorActorId } })).status()).toBe(200);
+    expect((await ctx.post("/api/agent/turn", { data: { vehicleId: run.vehicleId, message: "hola" } })).status()).toBe(403);
     // Caso inexistente o ajeno: 403 indistinto (no revela si el caso existe).
-    expect((await adv.post("/api/cases/no-existe/resolve", { data: { outcome: "CLOSE", resolution: "sin caso real" } })).status()).toBe(403);
-    await Promise.all([adv.dispose(), owner.dispose()]);
+    expect((await ctx.post("/api/cases/no-existe/resolve", { data: { outcome: "CLOSE", resolution: "sin caso real" } })).status()).toBe(403);
+    await ctx.dispose();
+  });
+
+  test("aislamiento entre visitantes: no se puede entrar como personas de otra corrida ni del seed @api", async () => {
+    const a = await pwRequest.newContext({ baseURL: base });
+    const b = await pwRequest.newContext({ baseURL: base });
+    const runA = await apiRun(a, "C");
+    await apiTurn(a, runA.vehicleId, "El freno se hunde y casi no detiene el carro");
+    await apiRun(b, "A");
+    for (const actorId of [runA.advisorActorId, runA.ownerActorId, "act-advisor", "act-owner-c1"]) {
+      expect((await b.post("/api/demo/session", { data: { actorId } })).status(), actorId).toBe(404);
+    }
+    // El asesor de A ve su caso; nadie más lo ve.
+    expect((await a.post("/api/demo/session", { data: { actorId: runA.advisorActorId } })).status()).toBe(200);
+    const cases = (await (await a.get("/api/cases")).json()) as { cases: Array<{ vehicle: { vehicleId: string } }> };
+    expect(cases.cases.map((k) => k.vehicle.vehicleId)).toEqual([runA.vehicleId]);
+    await Promise.all([a.dispose(), b.dispose()]);
   });
 
   test("entradas inválidas se rechazan con errores estables @api", async () => {

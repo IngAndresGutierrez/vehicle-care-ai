@@ -49,7 +49,7 @@ export function LlmLabel({ config }: { config: DemoConfig | null }) {
   return config.llm.simulated ? (
     <SimStamp title="Respuestas deterministas programadas. No es IA generativa.">Asistente simulado (ScriptedLlm)</SimStamp>
   ) : (
-    <span className="inline-flex items-center rounded-md border border-oil/40 bg-oil-soft px-2 text-[12px] font-semibold leading-5 text-oil" title={`Modelo ${config.llm.model}`}>
+    <span className="inline-flex items-center rounded-md border border-oil/40 bg-oil-soft px-2 text-[12px] font-semibold leading-5 text-[#1f5c40]" title={`Modelo ${config.llm.model}`}>
       IA generativa: {config.llm.model}
     </span>
   );
@@ -60,10 +60,11 @@ function PersonaSwitcher({ me, config }: { me: MeView | null; config: DemoConfig
   const runs = useRuns();
   const [busy, setBusy] = useState(false);
   if (!config?.demoMode) return null;
-  const options = [
-    ...runs.map((r) => ({ id: r.ownerActorId, text: `Propietario, escenario ${r.scenario} (${r.runId.slice(0, 4)})`, go: `/vehiculo/${r.vehicleId}?servicio=${r.serviceCode}` })),
-    ...config.staff.map((s) => ({ id: s.actorId, text: s.label, go: "/casos" })),
-  ];
+  // Solo personas de corridas iniciadas en este navegador (el servidor lo verifica con una cookie firmada).
+  const options = runs.flatMap((r) => [
+    { id: r.ownerActorId, text: `Propietario, escenario ${r.scenario} (${r.runId.slice(0, 4)})`, go: `/vehiculo/${r.vehicleId}?servicio=${r.serviceCode}` },
+    ...(r.advisorActorId ? [{ id: r.advisorActorId, text: `Asesor, escenario ${r.scenario} (${r.runId.slice(0, 4)})`, go: "/casos" }] : []),
+  ]);
   if (options.length === 0) return null;
   const current = options.some((o) => o.id === me?.actorId) ? me?.actorId : "";
   return (
@@ -119,7 +120,7 @@ export function AppShell({ boot, nav, children }: { boot: Bootstrap; nav?: Array
           <div className="ml-auto flex items-center gap-3">
             {me && (
               <span className="hidden text-sm text-white/80 md:inline">
-                {me.displayName} <span className="text-white/50">({label(ROLE, me.role)})</span>
+                {me.displayName} <span className="text-white/70">({label(ROLE, me.role)})</span>
               </span>
             )}
             <PersonaSwitcher me={me} config={config} />

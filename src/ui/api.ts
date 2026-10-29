@@ -11,13 +11,13 @@ export interface DemoConfig {
   demoMode: boolean;
   llm: { provider: "ANTHROPIC" | "SCRIPTED"; model: string; simulated: boolean };
   scenarios: Array<{ key: "A" | "B" | "C" | "D"; title: string; description: string; serviceCode: string; suggestedMessages: string[] }>;
-  staff: Array<{ actorId: string; label: string }>;
 }
 
 export interface DemoRun {
   runId: string;
   scenario: "A" | "B" | "C" | "D";
   ownerActorId: string;
+  advisorActorId: string;
   vehicleId: string;
   serviceCode: string;
   startedAt: string;

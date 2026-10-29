@@ -109,11 +109,13 @@ describe("POST /api/bookings/confirm (clic humano, fuera del LLM)", () => {
 
 describe("POST /api/demo/session", () => {
   it("emite una cookie firmada HttpOnly rotulada como sesión simulada solo con DEMO_MODE", async () => {
-    const res = await handleDemoSession(post("/api/demo/session", { actorId: A.ownerC1 }), container());
+    // Personas fijas del seed: solo con DEMO_SEED_PERSONAS=true (uso local); en la demo pública, 404 (ADR-020).
+    expect((await handleDemoSession(post("/api/demo/session", { actorId: A.ownerC1 }), container())).status).toBe(404);
+    const res = await handleDemoSession(post("/api/demo/session", { actorId: A.ownerC1 }), container({ DEMO_SEED_PERSONAS: "true" }));
     expect(res.status).toBe(200);
     expect(res.headers.get("set-cookie")).toMatch(/^vc_session=.+; Path=\/; HttpOnly; SameSite=Lax; Max-Age=28800/);
     expect(await res.json()).toMatchObject({ role: "OWNER", label: "Sesión simulada (demo)" });
-    expect((await handleDemoSession(post("/api/demo/session", { actorId: A.ownerC1 }), container({ DEMO_MODE: "false" }))).status).toBe(404);
-    expect((await handleDemoSession(post("/api/demo/session", { actorId: "nadie" }), container())).status).toBe(404);
+    expect((await handleDemoSession(post("/api/demo/session", { actorId: A.ownerC1 }), container({ DEMO_MODE: "false", DEMO_SEED_PERSONAS: "true" }))).status).toBe(404);
+    expect((await handleDemoSession(post("/api/demo/session", { actorId: "nadie" }), container({ DEMO_SEED_PERSONAS: "true" }))).status).toBe(404);
   });
 });

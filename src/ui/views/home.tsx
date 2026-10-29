@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { api, ApiError, saveRun, type DemoConfig } from "../api";
+import { api, ApiError, saveRun, useRuns, type DemoConfig } from "../api";
 import { label, SERVICE } from "../labels";
 import { Button, ErrorNote, Panel, SimStamp, Spinner } from "../primitives";
 import { AppShell, LlmLabel, useBootstrap } from "../shell";
@@ -20,6 +20,8 @@ export function HomeView() {
   const [starting, setStarting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { config } = boot;
+  const runs = useRuns();
+  const lastRun = runs.find((r) => r.advisorActorId);
 
   async function start(s: DemoConfig["scenarios"][number]) {
     setStarting(s.key);
@@ -29,15 +31,22 @@ export function HomeView() {
       saveRun({ ...run, startedAt: new Date().toISOString() });
       router.push(`/vehiculo/${run.vehicleId}?servicio=${run.serviceCode}&escenario=${s.key}`);
     } catch (e) {
-      setError(e instanceof ApiError && e.code === "RATE_LIMITED" ? "Se iniciaron demasiadas corridas desde esta red. Espera unos minutos." : "No fue posible preparar el escenario. Intenta de nuevo.");
+      setError(
+        e instanceof ApiError && e.code === "RATE_LIMITED"
+          ? "Se iniciaron demasiadas corridas desde esta red. Espera unos minutos."
+          : e instanceof ApiError && e.code === "DEMO_DAILY_LIMIT"
+            ? "La demo alcanzó su límite diario de corridas. Intenta mañana."
+            : "No fue posible preparar el escenario. Intenta de nuevo.",
+      );
       setStarting(null);
     }
   }
 
   async function openInbox() {
+    if (!lastRun) return;
     setStarting("inbox");
     try {
-      await api.switchPersona("act-advisor");
+      await api.switchPersona(lastRun.advisorActorId);
       router.push("/casos");
     } catch {
       setError("No fue posible entrar como asesor.");
@@ -104,9 +113,11 @@ export function HomeView() {
             <Panel className="mt-4 flex flex-wrap items-center justify-between gap-3 p-4">
               <div>
                 <h3 className="font-semibold text-ink">Bandeja del asesor</h3>
-                <p className="text-sm text-muted">Casos escalados de las corridas de demo y acciones humanas permitidas.</p>
+                <p className="text-sm text-muted">
+                  {lastRun ? `Casos de tu escenario ${lastRun.scenario} más reciente y las acciones humanas permitidas.` : "Cada escenario tiene su propio asesor. Inicia uno (B o C generan casos) para ver su bandeja."}
+                </p>
               </div>
-              <Button variant="secondary" disabled={starting !== null} onClick={openInbox} data-testid="open-inbox">
+              <Button variant="secondary" disabled={starting !== null || !lastRun} onClick={openInbox} data-testid="open-inbox">
                 Entrar como asesor
               </Button>
             </Panel>

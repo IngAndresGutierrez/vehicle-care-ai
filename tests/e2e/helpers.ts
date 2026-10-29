@@ -35,6 +35,9 @@ export async function say(page: Page, text: string) {
   await expect(page.getByText(text, { exact: true }).last()).toBeVisible();
 }
 
+/** Asesor sintético propio de la corrida (ADR-020). */
+export const advisorOf = (vehicleId: string) => vehicleId.replace(/-vehiculo$/, "-asesor");
+
 export async function switchPersona(page: Page, actorId: string, then: string) {
   const res = await page.request.post("/api/demo/session", { data: { actorId } });
   expect(res.ok()).toBeTruthy();
@@ -45,7 +48,7 @@ export async function switchPersona(page: Page, actorId: string, then: string) {
 export async function apiRun(request: APIRequestContext, scenario: "A" | "B" | "C" | "D") {
   const res = await request.post("/api/demo/scenarios", { data: { scenario } });
   expect(res.status()).toBe(200);
-  return (await res.json()) as { runId: string; ownerActorId: string; vehicleId: string; serviceCode: string };
+  return (await res.json()) as { runId: string; ownerActorId: string; advisorActorId: string; vehicleId: string; serviceCode: string };
 }
 
 export async function apiTurn(request: APIRequestContext, vehicleId: string, message: string, sessionId?: string) {

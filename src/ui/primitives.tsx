@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { Tone } from "./labels";
 
 const TONE: Record<Tone, string> = {
-  ok: "bg-oil-soft text-oil border-oil/30",
+  ok: "bg-oil-soft text-[#1f5c40] border-oil/30",
   warn: "bg-amber-soft text-[#8a5a12] border-amber/40",
   danger: "bg-brake-soft text-brake border-brake/30",
   neutral: "bg-paper text-muted border-line",

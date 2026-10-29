@@ -3,7 +3,8 @@ import { ScriptedLlm } from "@/agent/llm/scripted-llm";
 import { DEMO_NOW } from "@/domain/maintenance-engine/__fixtures__/synthetic-demo";
 import { fixedClock } from "@/infra/clock";
 import { buildContainer, type Container } from "@/infra/container";
-import { handleAgentTurn, handleBookingConfirm } from "@/infra/http/handlers";
+import { handleAgentTurn, handleBookingConfirm, handleDemoSession } from "@/infra/http/handlers";
+import { restoreSimulatedSlots } from "@/application/demo/demo-runs";
 import { handleCases, handleDemoConfig, handleDemoSlotTaken, handleDemoStart, handleMe, handleResolveCase, handleVehicleOverview, handleVehicleTrace } from "@/infra/http/view-handlers";
 import { DEMO_IDS } from "@/infra/seed/demo-seed";
 import { SESSION_COOKIE, signSession } from "@/infra/session";
@@ -24,12 +25,13 @@ const req = (url: string, init: { method?: string; body?: unknown; cookie?: stri
     headers: { ...(init.body !== undefined ? { "content-type": "application/json" } : {}), ...(init.cookie ? { cookie: init.cookie } : {}), ...init.headers },
     body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
   });
-const cookieFrom = (res: Response) => res.headers.get("set-cookie")!.split(";")[0];
+const cookiesFrom = (res: Response) => res.headers.getSetCookie().map((c) => c.split(";")[0]);
+const cookieFrom = (res: Response) => cookiesFrom(res).find((c) => c.startsWith(`${SESSION_COOKIE}=`))!;
 
 async function startRun(c: Container, scenario: "A" | "B" | "C" | "D") {
   const res = await handleDemoStart(req("/api/demo/scenarios", { body: { scenario } }), c);
   expect(res.status).toBe(200);
-  return { run: (await res.json()) as { runId: string; vehicleId: string; ownerActorId: string; serviceCode: string }, cookie: cookieFrom(res) };
+  return { run: (await res.json()) as { runId: string; vehicleId: string; ownerActorId: string; advisorActorId: string; serviceCode: string }, cookie: cookieFrom(res), browser: cookiesFrom(res).join("; ") };
 }
 
 async function turn(c: Container, cookie: string, vehicleId: string, message: string, extra: Record<string, string> = {}) {
@@ -84,6 +86,28 @@ describe("Demo: corridas aisladas (solo DEMO_MODE)", () => {
     expect((await handleVehicleOverview(req(`/api/vehicles/${V.v1}/overview`, { cookie }), c, V.v1)).status).toBe(403);
   });
 
+  it("cambio de persona: solo a personas de corridas iniciadas en el mismo navegador", async () => {
+    const c = container();
+    const mine = await startRun(c, "B");
+    const other = await startRun(c, "B");
+    const switchTo = (actorId: string, cookie?: string) => handleDemoSession(req("/api/demo/session", { body: { actorId }, cookie }), c);
+    expect((await switchTo(mine.run.advisorActorId, mine.browser)).status).toBe(200);
+    expect((await switchTo(mine.run.ownerActorId, mine.browser)).status).toBe(200);
+    // Persona de otra corrida, sin cookie, con cookie manipulada o persona fija del seed: 404 indistinto.
+    expect((await switchTo(other.run.advisorActorId, mine.browser)).status).toBe(404);
+    expect((await switchTo(mine.run.advisorActorId)).status).toBe(404);
+    expect((await switchTo(mine.run.advisorActorId, mine.browser.replace(/vc_demo_runs=[^.]+/, "vc_demo_runs=eyJydW5zIjpbXX0"))).status).toBe(404);
+    expect((await switchTo(A.advisor, mine.browser)).status).toBe(404);
+  });
+
+  it("tope diario global de corridas (contado en la base)", async () => {
+    const c = container({ DEMO_RUNS_PER_DAY: "1" });
+    await startRun(c, "A");
+    const res = await handleDemoStart(req("/api/demo/scenarios", { body: { scenario: "A" } }), c);
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ error: { code: "DEMO_DAILY_LIMIT" } });
+  });
+
   it("limita las corridas por IP", async () => {
     const c = container({ DEMO_RUNS_PER_10_MIN: "1" });
     expect((await handleDemoStart(req("/api/demo/scenarios", { body: { scenario: "A" }, headers: { "x-forwarded-for": "203.0.113.9" } }), c)).status).toBe(200);
@@ -102,6 +126,15 @@ describe("Demo: corridas aisladas (solo DEMO_MODE)", () => {
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({ error: { code: "SLOT_CONFLICT" } });
     expect(await db.booking.count({ where: { vehicleId: run.vehicleId, status: "CONFIRMED" } })).toBe(0);
+
+    // Vencida la intención, el cupo vuelve al calendario compartido (una sola vez) y queda auditado.
+    const sim = await db.auditLog.findFirstOrThrow({ where: { action: "DEMO_SLOT_TAKEN_SIMULATED" } });
+    const slotRef = (sim.details as { slotRef: string }).slotRef;
+    expect((await db.mockSlot.findUniqueOrThrow({ where: { id: slotRef } })).remaining).toBe(0);
+    const later = new Date(DEMO_NOW.getTime() + 16 * 60_000);
+    expect(await restoreSimulatedSlots(db, later)).toBe(1);
+    expect(await restoreSimulatedSlots(db, later)).toBe(0);
+    expect((await db.mockSlot.findUniqueOrThrow({ where: { id: slotRef } })).remaining).toBeGreaterThan(0);
   });
 });
 
@@ -147,8 +180,12 @@ describe("Vistas: portal, trazas y bandeja", () => {
     expect(t.cards.map((x) => x.type)).toContain("HUMAN_CASE");
     expect((await handleCases(req("/api/cases", { cookie }), c)).status).toBe(403);
 
-    const advisor = cookieFor(A.advisor);
+    // El asesor fijo del seed no ve casos de corridas demo: cada corrida tiene su propio asesor (ADR-020).
+    const seeded = await (await handleCases(req("/api/cases", { cookie: cookieFor(A.advisor) }), c)).json();
+    expect(seeded.cases.some((k: { vehicle: { vehicleId: string } }) => k.vehicle.vehicleId === run.vehicleId)).toBe(false);
+    const advisor = cookieFor(run.advisorActorId);
     const { cases } = await (await handleCases(req("/api/cases", { cookie: advisor }), c)).json();
+    expect(cases).toHaveLength(1);
     const kase = cases.find((k: { vehicle: { vehicleId: string } }) => k.vehicle.vehicleId === run.vehicleId);
     expect(kase).toMatchObject({ reason: "INSUFFICIENT_HISTORY", canResolve: true, allowedOutcomes: ["REEVALUATE", "CLOSE"], journey: { state: "HUMAN_REVIEW", agentPaused: true }, openedByRole: expect.not.stringMatching(/HUMANO/) });
 

@@ -63,6 +63,8 @@ export interface DemoRun {
   runId: string;
   scenario: DemoScenarioKey;
   ownerActorId: string;
+  /** Asesor sintético de esta corrida: su cartera es solo este cliente (aislamiento entre visitantes, ADR-020). */
+  advisorActorId: string;
   customerId: string;
   vehicleId: string;
   serviceCode: string;
@@ -80,7 +82,7 @@ export async function startDemoScenario({ db, clock }: { db: Db; clock: Clock },
   const shiftDay = (d: Date) => new Date(`${addDaysToLocalDate(d.toISOString().slice(0, 10), dayOffset)}T00:00:00.000Z`);
 
   const runId = randomBytes(4).toString("hex");
-  const ids = { customer: `demo-${runId}-cliente`, owner: `demo-${runId}-propietario`, vehicle: `demo-${runId}-vehiculo` };
+  const ids = { customer: `demo-${runId}-cliente`, owner: `demo-${runId}-propietario`, advisor: `demo-${runId}-asesor`, vehicle: `demo-${runId}-vehiculo` };
   const src = (what: string) => `SYNTHETIC-DEMO:demo-run/${runId}/${what}`;
 
   const template = await db.vehicle.findUnique({
@@ -93,6 +95,7 @@ export async function startDemoScenario({ db, clock }: { db: Db; clock: Clock },
   const created = await runInTransaction<DemoRun, AppError>(db, async (tx) => {
     await tx.customer.create({ data: { id: ids.customer, displayName: `Cliente demo ${runId}`, city: "Ciudad Demo", dataOrigin: "SYNTHETIC", syntheticSourceRef: src("cliente") } });
     await tx.actorAccount.create({ data: { id: ids.owner, role: "OWNER", displayName: `Propietario demo ${runId}`, customerId: ids.customer, isDemo: true } });
+    await tx.actorAccount.create({ data: { id: ids.advisor, role: "ADVISOR", displayName: `Asesor demo ${runId}`, isDemo: true } });
     for (const c of consentTemplate) {
       await tx.consent.create({
         data: {
@@ -119,8 +122,8 @@ export async function startDemoScenario({ db, clock }: { db: Db; clock: Clock },
       },
     });
     await tx.vehicleOwnership.create({ data: { vehicleId: ids.vehicle, customerId: ids.customer, validFrom: shift(template.deliveredAt ?? DEMO_NOW), evidenceRef: src("titularidad") } });
-    // Las corridas demo se asignan a la cartera del asesor demo para poder mostrar la atención humana (ADR-019).
-    await tx.portfolioAssignment.create({ data: { actorId: A.advisor, customerId: ids.customer, validFrom: new Date(now.getTime() - 86_400_000) } });
+    // Cada corrida tiene su propio asesor sintético: un visitante nunca ve los casos de otro (ADR-020).
+    await tx.portfolioAssignment.create({ data: { actorId: ids.advisor, customerId: ids.customer, validFrom: new Date(now.getTime() - 86_400_000) } });
 
     for (const [i, r] of template.serviceRecords.entries()) {
       let workOrderId: string | null = null;
@@ -172,11 +175,12 @@ export async function startDemoScenario({ db, clock }: { db: Db; clock: Clock },
       });
     }
     await audit(tx, { actor: { actorId: "system:demo", role: "SYSTEM_JOB" }, action: "DEMO_RUN_STARTED", entityType: "Vehicle", entityId: ids.vehicle, details: { scenario, runId, templateVehicleId: def.templateVehicleId }, traceId, at: now });
-    return ok({ runId, scenario, ownerActorId: ids.owner, customerId: ids.customer, vehicleId: ids.vehicle, serviceCode: def.serviceCode });
+    return ok({ runId, scenario, ownerActorId: ids.owner, advisorActorId: ids.advisor, customerId: ids.customer, vehicleId: ids.vehicle, serviceCode: def.serviceCode });
   });
   if (!created.ok) return created;
 
   await ensureMockCalendar(db, now);
+  await restoreSimulatedSlots(db, now);
   await runEvaluationJob({ db, clock, notifications: new MockNotificationPort() }, { actor: SYSTEM_JOB, traceId, vehicleIds: [ids.vehicle] });
   return created;
 }
@@ -222,7 +226,34 @@ export async function simulateSlotTaken({ db, clock }: { db: Db; clock: Clock },
     orderBy: { createdAt: "desc" },
   });
   if (!intent) return err(appError("NOT_FOUND", "NO_PENDING_INTENT"));
+  const slot = await db.mockSlot.findUnique({ where: { id: intent.slotExternalRef }, select: { remaining: true } });
   await db.mockSlot.updateMany({ where: { id: intent.slotExternalRef }, data: { remaining: 0 } });
-  await audit(db, { actor: { actorId: actor.actorId, role: actor.role }, action: "DEMO_SLOT_TAKEN_SIMULATED", entityType: "BookingIntent", entityId: intent.id, details: { slotRef: intent.slotExternalRef, note: "Simulación de demo: otro cliente tomó el cupo" }, traceId, at: now });
+  await audit(db, { actor: { actorId: actor.actorId, role: actor.role }, action: "DEMO_SLOT_TAKEN_SIMULATED", entityType: "BookingIntent", entityId: intent.id, details: { slotRef: intent.slotExternalRef, previousRemaining: slot?.remaining ?? 0, note: "Simulación de demo: otro cliente tomó el cupo" }, traceId, at: now });
   return ok({ slotRef: intent.slotExternalRef, intentId: intent.id });
+}
+
+/** Tiempo tras el que se devuelve un cupo «tomado» por la simulación de D (la intención dura 10 min). */
+const SIMULATED_TAKE_TTL_MS = 15 * 60_000;
+
+/**
+ * Devuelve al calendario compartido los cupos que el escenario D dejó en cero, una vez vencida la intención: así la
+ * simulación de un visitante no deteriora la demo de los demás (ADR-020). Cada devolución queda en AuditLog.
+ */
+export async function restoreSimulatedSlots(db: Db, now: Date): Promise<number> {
+  const sims = await db.auditLog.findMany({
+    where: { action: "DEMO_SLOT_TAKEN_SIMULATED", occurredAt: { lte: new Date(now.getTime() - SIMULATED_TAKE_TTL_MS), gte: new Date(now.getTime() - 7 * 86_400_000) } },
+    select: { id: true, details: true },
+  });
+  if (sims.length === 0) return 0;
+  const done = new Set((await db.auditLog.findMany({ where: { action: "DEMO_SLOT_RESTORED", entityId: { in: sims.map((x) => x.id) } }, select: { entityId: true } })).map((x) => x.entityId));
+  let restored = 0;
+  for (const sim of sims.filter((x) => !done.has(x.id))) {
+    const d = sim.details as { slotRef?: string; previousRemaining?: number };
+    if (d.slotRef && (d.previousRemaining ?? 0) > 0) {
+      await db.$executeRaw`UPDATE "MockSlot" SET "remaining" = LEAST("capacity", "remaining" + ${d.previousRemaining}) WHERE "id" = ${d.slotRef}`;
+      restored++;
+    }
+    await audit(db, { actor: { actorId: "system:demo", role: "SYSTEM_JOB" }, action: "DEMO_SLOT_RESTORED", entityType: "AuditLog", entityId: sim.id, details: { slotRef: d.slotRef ?? null }, traceId: "demo-restore", at: now });
+  }
+  return restored;
 }

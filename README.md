@@ -8,7 +8,7 @@ PRD, `ARCHITECTURE.md`, `DATA_MODEL.md`, `AGENT_DESIGN.md`, `IMPLEMENTATION_PLAN
 
 ## Estado
 
-Fases 0 (scaffold), 1 (Maintenance Engine), 2 (persistencia, seed, políticas, evaluación sobre PostgreSQL), 3 (máquina de estados del journey, idempotencia, deduplicación de recordatorios, mínimo privilegio, escalamiento de seguridad), 4 (cotización, cupos, intención y confirmación de reservas, órdenes de trabajo; taller y CRM MOCK) y 5 (agente MaintenanceAdvisor, Tool Gateway, API `/api/agent/turn`) y 6 (interfaz navegable: portal del propietario, asistente, trazas y bandeja humana) implementadas. Integraciones reales: pendientes. Taller, CRM y mensajería son simulados (MOCK): la mensajería nunca envía.
+Fases 0 (scaffold), 1 (Maintenance Engine), 2 (persistencia, seed, políticas, evaluación sobre PostgreSQL), 3 (máquina de estados del journey, idempotencia, deduplicación de recordatorios, mínimo privilegio, escalamiento de seguridad), 4 (cotización, cupos, intención y confirmación de reservas, órdenes de trabajo; taller y CRM MOCK) y 5 (agente MaintenanceAdvisor, Tool Gateway, API `/api/agent/turn`) 6 (interfaz navegable: portal del propietario, asistente, trazas y bandeja humana) y 7 (endurecimiento de la demo pública, accesibilidad, evaluación agéntica y paquete de entrega) implementadas. Integraciones reales: pendientes. **Paquete de entrega: [`prd/ENTREGA.md`](./prd/ENTREGA.md).** Taller, CRM y mensajería son simulados (MOCK): la mensajería nunca envía.
 
 ## Requisitos
 
@@ -35,6 +35,9 @@ pnpm test:coverage
 pnpm test:integration           # Vitest, proyecto integration (PostgreSQL vehicle_care_test)
 pnpm validate                   # lint + typecheck + unit + integración
 pnpm test:evals                 # LLM real de Anthropic: se omite si no hay ANTHROPIC_API_KEY
+pnpm eval:agent                 # evaluación agéntica (12 casos, base desechable) con ScriptedLlm, sin costo
+# Con Claude real (gasta créditos; requiere aprobación y presupuesto):
+# EVAL_LLM=anthropic EVAL_BUDGET_USD=2 ANTHROPIC_API_KEY=… pnpm eval:agent
 
 pnpm build && pnpm start        # app en http://localhost:3000 (requiere DEMO_MODE=true para la demo)
 pnpm test:e2e:install           # una vez: Chromium para Playwright
@@ -73,15 +76,33 @@ tests/evals/                    pruebas con el LLM real (se omiten sin ANTHROPIC
    - **B. Historial insuficiente:** usa el servicio «Correa de distribución». El estado queda en «Sin datos suficientes» y se abre un caso.
    - **C. Síntoma de seguridad:** el asistente se detiene y las cotizaciones quedan bloqueadas hasta la decisión humana.
    - **D. Cupo que desaparece:** después de preparar la reserva, pulsa «Simular que otro cliente tomó el cupo» y luego confirma. Verás el conflicto y podrás elegir otro horario.
-3. «Ver como → Asesor de postventa (demo)» abre la **bandeja de casos**. Desde ahí se resuelven los casos de B y C, y «Trazas» muestra la línea de tiempo con herramientas, fuentes (MOCK/interno), estado y responsable.
+3. «Ver como → Asesor, escenario X» (o «Entrar como asesor» en la portada) abre la **bandeja de casos** del asesor propio de esa corrida. Desde ahí se resuelven los casos de B y C, y «Trazas» muestra la línea de tiempo con herramientas, fuentes (MOCK/interno), estado y responsable.
+
+Cada visitante solo puede entrar como personas de corridas iniciadas en su navegador (cookie firmada). Las personas fijas del seed solo están disponibles con `DEMO_SEED_PERSONAS=true`, para uso local (ADR-020).
 
 Todo lo simulado lleva un sello punteado. Con `LLM_PROVIDER=scripted` el asistente se rotula **«Asistente simulado (ScriptedLlm)»: no es IA generativa**.
 
-Pantallas: `/` (escenarios), `/vehiculo/[id]` (portal y asistente), `/trazas/[id]`, `/casos`. API y decisiones: ADR-019.
+Pantallas: `/` (escenarios), `/vehiculo/[id]` (portal y asistente), `/trazas/[id]`, `/casos`. API y decisiones: ADR-019 y ADR-020.
 
-## Despliegue en Vercel (preparado, no ejecutado)
+## Despliegue en Vercel (preparado, no ejecutado: no hay credenciales de Vercel en este entorno)
 
 - **Base de datos:** PostgreSQL gestionado desde el Marketplace de Vercel (p. ej. Neon) con `DATABASE_URL`. Las migraciones **no** corren en el build. Ejecuta una vez desde tu máquina o CI: `DATABASE_URL=… pnpm db:migrate:deploy && DATABASE_URL=… pnpm db:seed`.
-- **Variables:** `DATABASE_URL`, `SESSION_SECRET` y `LOG_HASH_SECRET` (≥ 32 caracteres, aleatorios), `DEMO_MODE=true` (solo en el entorno de demo), `LLM_PROVIDER=scripted`. Opcionales: `LLM_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`, `LLM_MODEL`.
+- **Variables** (secretas en Vercel; nunca en el repositorio):
+  - `DATABASE_URL`;
+  - `SESSION_SECRET` y `LOG_HASH_SECRET`: ≥ 32 caracteres, aleatorios y distintos (`openssl rand -base64 48`);
+  - `DEMO_MODE=true`, solo en el entorno de demo;
+  - `LLM_PROVIDER=scripted`;
+  - `DEMO_RUNS_PER_10_MIN=12` y `DEMO_RUNS_PER_DAY=500`;
+  - `DEMO_SEED_PERSONAS=false`.
+  
+  `LLM_PROVIDER=anthropic` con `ANTHROPIC_API_KEY` solo con un presupuesto aprobado: una demo pública con LLM real expone costos.
+- **Pasos:**
+  1. Crear el proyecto (`vercel link`).
+  2. Agregar Postgres desde el Marketplace.
+  3. Cargar las variables con `vercel env add`.
+  4. Migrar y sembrar la base una vez.
+  5. Publicar con `vercel deploy --prod`.
+  6. Comprobar `GET /api/demo/config` (`demoMode: true`, `llm.simulated: true`) y recorrer A–D.
 - **Build:** `pnpm install` (incluye `prisma generate`) y `next build`. Runtime Node.js por defecto. La cookie de sesión lleva `Secure` en producción.
-- **Limitaciones:** el limitador de tasa es en memoria y vale por instancia, no global. Para producción conviene un almacén compartido (p. ej. Redis del Marketplace). Las corridas de demo agregan filas que no se borran (tablas append-only); vigila el tamaño de la base de demo.
+- **Protección:** límite por IP (en memoria, por instancia), **tope diario global contado en la base**, sesiones firmadas HttpOnly y Secure, cabeceras de seguridad y `noindex`. No hay endpoints de seed ni reset.
+- **Limitaciones:** el limitador por IP es en memoria y vale por instancia, no global. Para producción conviene un almacén compartido (p. ej. Redis del Marketplace). Las corridas de demo agregan filas que no se borran (tablas append-only); vigila el tamaño de la base de demo.

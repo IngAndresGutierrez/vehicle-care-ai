@@ -209,6 +209,7 @@ export function AdvisorChat({
             ))}
           </div>
         )}
+        <p className="mb-1.5 text-[12px] text-muted">Demo con datos sintéticos: no escribas datos personales reales.</p>
         <form
           className="flex gap-2"
           onSubmit={(e) => {

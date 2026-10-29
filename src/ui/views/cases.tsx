@@ -198,7 +198,7 @@ export function CasesView() {
       <div className="mt-5 space-y-4">
         {error ? (
           <ErrorNote title={error.status === 403 ? "La bandeja es solo para el equipo de atención" : "No fue posible cargar la bandeja"}>
-            {error.status === 403 ? "Cambia a la persona «Asesor de postventa (demo)» desde el menú superior." : "Intenta de nuevo."}
+            {error.status === 403 ? "Cambia a la persona «Asesor» de tu escenario desde el menú «Ver como»." : "Intenta de nuevo."}
           </ErrorNote>
         ) : !cases ? (
           <Spinner label="Cargando casos" />

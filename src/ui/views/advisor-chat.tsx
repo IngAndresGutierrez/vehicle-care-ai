@@ -89,6 +89,8 @@ export function AdvisorChat({
       const messageText =
         err?.code === "RATE_LIMITED"
           ? "Enviaste muchos mensajes seguidos. Espera un momento y reintenta."
+          : err?.code === "TURN_IN_PROGRESS" || err?.code === "CONCURRENT_TURN"
+            ? "Tu mensaje anterior todavía se está procesando. Espera la respuesta y vuelve a intentarlo."
           : err?.code === "NETWORK"
             ? "Se perdió la conexión. Revisa tu red y reintenta."
             : err?.status === 401

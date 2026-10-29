@@ -238,7 +238,8 @@ describe("Sesión, consentimiento y concurrencia", () => {
       advisor.handleTurn({ owner: OWNER_C1, vehicleId: V.v1, sessionId: t.sessionId, message: "¿Qué mantenimiento le toca a mi carro?", traceId: "c2" }),
     ]);
     expect(results.filter((r) => r.ok)).toHaveLength(1);
-    expect(results.find((r) => !r.ok)).toMatchObject({ error: { status: 409, code: "CONCURRENT_TURN" } });
+    // Fase 8B: el segundo turno se rechaza al inicio (lease), sin ejecutar herramientas; CONCURRENT_TURN queda como respaldo al guardar.
+    expect(results.find((r) => !r.ok)).toMatchObject({ error: { status: 409, code: "TURN_IN_PROGRESS" } });
     await expect(db.conversationSession.update({ where: { id: t.sessionId }, data: { transcript: [] } })).rejects.toThrow(/append-only/);
   });
 });

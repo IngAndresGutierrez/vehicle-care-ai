@@ -20,7 +20,7 @@ interface ServerContext {
   memory: {
     workshops: Array<{ workshopId: string; name: string }>;
     activeQuote: { quoteId: string; workshopId: string } | null;
-    offeredSlots: Array<{ slotRef: string; startsAt: string; workshopId: string }>;
+    offeredSlots: Array<{ slotRef: string }>;
   };
 }
 

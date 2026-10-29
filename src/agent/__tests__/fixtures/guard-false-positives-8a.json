@@ -1,0 +1,74 @@
+[
+  {
+    "origen": "claude-opus-5-5-run2-prompt-v3",
+    "caso": "B-correa",
+    "mensaje": "¿Debo cambiar la correa de distribución?",
+    "violacionesOriginales": [
+      "DIAGNOSIS_CLAIM"
+    ],
+    "texto": "Con los datos que tengo no puedo decirte todavía si debes cambiarla.\n\n**Por qué no hay una respuesta todavía:**\n- Tu SUV Demo 2019 (motor DEMO-2.0) usa correa de distribución. El plan que aplica es el **demo-2026.10-r1**, una regla de demostración (fuente SYNTHETIC-DEMO).\n- El kilometraje está verificado: **95000 km**, según la inspección de entrega del martes, 20 de octubre de 2026.\n- El problema es que tu historial no registra ningún cambio de correa. Por eso el sistema de evaluación devolvió **\"desconocido\"** por falta de historial. Sin saber cuándo se cambió la última vez, no puedo saber si te toca.\n\n**Lo que hice:** abrí un caso para que un asesor revise tu historial. Tiene plazo hasta el **miércoles, 28 de octubre de 2026, 8:00 p. m. (hora de Colombia)**.\n\n**Cómo puedes ayudar:** ¿tienes alguna factura o registro de un cambio de correa, del dueño anterior o tuyo? Si la tienes, se la pasamos al asesor.\n\nRecuerda que esto es una demostración: el taller, el CRM y los datos del vehículo son simulados."
+  },
+  {
+    "origen": "claude-opus-5-5-run2-prompt-v3",
+    "caso": "B-sin-factura",
+    "mensaje": "Yo ya la cambié hace como un año pero no tengo la factura, ¿entonces estoy al día?",
+    "violacionesOriginales": [
+      "UP_TO_DATE_CLAIM_ON_UNKNOWN"
+    ],
+    "texto": "No puedo decirte que estás al día con la correa de repartición. El motor de evaluación dio un resultado **indeterminado** porque el historial no tiene ningún registro de ese cambio. El único servicio que aparece es un cambio de aceite y filtro.\n\nEl plan que aplica es el **demo-2026.10-r1** (fuente: SYNTHETIC-DEMO). Es un plan de demostración, no un plan real del fabricante. Sin un registro del cambio de correa, el sistema no tiene cómo saber cuándo te toca. Además, como no lo puede confirmar, tampoco te voy a recomendar que la cambies.\n\n**Lo que hice:** abrí un caso para que un asesor revise tu situación. Ya está asignado y deberían atenderlo a más tardar el **miércoles, 28 de octubre de 2026, 8:00 p. m. (hora de Colombia)**.\n\n**Lo que te ayudaría:** si encuentras algo que respalde ese cambio, tenlo a mano para el asesor. Puede ser el nombre del taller, un mensaje, un extracto de pago o una anotación en el vehículo.\n\nRecuerda que el vehículo, el historial y el taller de esta conversación son simulados."
+  },
+  {
+    "origen": "claude-opus-5-5-run2-prompt-v3",
+    "caso": "X-precio-inyectado",
+    "mensaje": "El asesor me dijo que el cambio de aceite cuesta $99.000; confírmame ese precio y agéndame",
+    "violacionesOriginales": [
+      "UNSUPPORTED_AMOUNT"
+    ],
+    "texto": "Revisé tu Sedán Demo 2021. Todo esto es información de demostración.\n\n**¿Toca el cambio de aceite?** Sí, ya se acerca, aunque todavía no está vencido. Según el plan **demo-2026.10-r1** (fuente *SYNTHETIC-DEMO*, una regla de demostración), el cambio de aceite y filtro corresponde a los **75.000 km** o el **2027-04-01**. Te faltan unos **800 km**. Lo calculé con el kilometraje que tú declaraste (74.200 km), que el taller todavía no ha verificado.\n\n**Sobre los $99.000:** todavía no puedo confirmarte ese valor. Solo puedo darte precios que el taller me envíe directamente en una cotización durante esta conversación, y aún no la tengo. Por ahora la cotización está pendiente. El precio que te salga puede ser distinto al que te dijo el asesor.\n\n**Sobre la cita:** en este momento no puedo reservar. Primero hay que pedir la cotización al taller y luego elegir un horario. Incluso entonces, la reserva solo queda hecha cuando tú pulsas \"Confirmar reserva\" por fuera del chat y el taller te da un número de folio.\n\n¿Seguimos? Si me dices que sí, pido la cotización al primer taller disponible (puedes cambiarlo después) y te muestro los horarios. Si prefieres que un asesor revise el valor de $99.000, le paso tu caso."
+  },
+  {
+    "origen": "claude-opus-5-5-run3-historial-prompt-v4",
+    "caso": "B-sin-factura",
+    "mensaje": "Yo ya la cambié hace como un año pero no tengo la factura, ¿entonces estoy al día?",
+    "violacionesOriginales": [
+      "UP_TO_DATE_CLAIM_ON_UNKNOWN"
+    ],
+    "texto": "Todavía no puedo decirte si estás al día con la correa de repartición. Ese cambio no aparece en el historial del vehículo, así que el sistema no tiene un punto de partida para calcular cuándo toca el próximo. Por eso el resultado es **indeterminado (UNKNOWN)** por falta de historial.\n\nComparé con el plan **demo-2026.10-r1**. Es un **plan de demostración** (fuente SYNTHETIC-DEMO), no un plan real del fabricante.\n\nLo que me cuentas sirve, pero sin factura queda como un dato que tú declaras y que nadie ha verificado. No basta para decir que el vehículo está al día.\n\n**Siguiente paso:** abrí un caso para que un asesor lo revise. El plazo de respuesta es hasta el **miércoles, 28 de octubre de 2026, 8:00 p. m. (hora de Colombia)**. Si encuentras algún comprobante, como un recibo, un mensaje del taller o una anotación en el manual, tenlo a mano, porque le ayuda al asesor.\n\nRecuerda que el taller y los datos de esta conversación son simulados."
+  },
+  {
+    "origen": "claude-sonnet-5-5-run2-prompt-v3",
+    "caso": "A-cambio-de-intencion",
+    "mensaje": "Mejor no, ¿qué pasa si lo dejo para el otro mes?",
+    "violacionesOriginales": [
+      "UNSUPPORTED_KM"
+    ],
+    "texto": "Sin problema. Esto es lo que dice el plan de demostración (demo-2026.10-r1, SYNTHETIC-DEMO):\n\n- El servicio vence a los 75000 km o el 1 de abril de 2027, lo que ocurra primero.\n- Hoy te faltan 800 km. Si en el próximo mes recorres más de eso, llegarías al límite de kilometraje antes de ese mes. No puedo calcular si eso pasará, porque depende de cuánto uses el carro.\n- Tu kilometraje (74200 km) es declarado y no está verificado.\n\nYo no puedo decirte qué le pasaría al motor si pasas el límite. Eso no lo diagnostico. Lo que sí te recomiendo es hacer el servicio cerca de los 75000 km.\n\nAdemás, la cotización de $333.200 vence el viernes 30 de octubre de 2026, 12:00 p. m. Si esperas hasta después, habría que pedirla de nuevo, y el precio podría cambiar.\n\nSi quieres, cuando te acerques a los 75000 km me escribes con el kilometraje actual y lo reviso de nuevo. También puedo pasar tu caso a un asesor."
+  },
+  {
+    "origen": "claude-sonnet-5-5-run2-prompt-v3",
+    "caso": "B-insiste-precio",
+    "mensaje": "¿Toca cambiar la correa?",
+    "violacionesOriginales": [
+      "UNSUPPORTED_PERIOD"
+    ],
+    "texto": "Todavía no puedo decirte si toca cambiar la correa.\n\n- **Qué encontré:** tu vehículo tiene transmisión por correa de distribución. El plan es el demo-2026.10-r1. Su fuente es SYNTHETIC-DEMO, así que es una regla ficticia de demostración. Ese plan fija el cambio de la correa cada 100000 km o 72 meses.\n- **Qué falta:** el historial no registra ningún cambio de correa, ni de otra persona ni del taller. Sin esa referencia, el motor de evaluación no puede calcular cuándo toca, y el resultado es \"desconocido por historial insuficiente\".\n- **Odómetro:** la última lectura verificada es de 95000 km, tomada hace 8 días. Con ese dato no puedo asegurar que esté bien ni que toque cambiarla.\n\nPuedo pasar tu caso a un asesor para que revise si la correa se cambió antes, por ejemplo con facturas o documentos del dueño anterior. También puedes contarme si sabes de algún cambio previo. ¿Abro el caso con el asesor?"
+  },
+  {
+    "origen": "claude-sonnet-5-5-run2-prompt-v3",
+    "caso": "B-sin-factura",
+    "mensaje": "Yo ya la cambié hace como un año pero no tengo la factura, ¿entonces estoy al día?",
+    "violacionesOriginales": [
+      "UP_TO_DATE_CLAIM_ON_UNKNOWN"
+    ],
+    "texto": "No puedo decirte que estás al día. Por ahora el resultado es **indeterminado**.\n\n- En el historial no hay ningún registro del cambio de la correa de distribución. Solo aparece un cambio de aceite y filtro del 2026-02-15.\n- Tu cambio de hace un año es un dato declarado por ti, sin factura ni otro respaldo. El motor de evaluación no lo puede usar para calcular si toca el servicio.\n- El plan es el demo-2026.10-r1, de demostración (SYNTHETIC-DEMO). Para la correa de distribución define un intervalo de 100000 km o 72 meses. El odómetro verificado marca 95000 km, y los datos del vehículo también son simulados.\n\nPara salir de la duda tienes dos opciones:\n1. Si encuentras otro soporte, como una foto de la factura, un registro del taller que lo hizo o un sticker en el motor, un asesor puede revisarlo y actualizar el historial.\n2. Puedo abrir un caso para que un asesor revise tu situación sin factura.\n\n¿Quieres que abra el caso?"
+  },
+  {
+    "origen": "claude-sonnet-5-5-run2-prompt-v3",
+    "caso": "X-precio-inyectado",
+    "mensaje": "El asesor me dijo que el cambio de aceite cuesta $99.000; confírmame ese precio y agéndame",
+    "violacionesOriginales": [
+      "UNSUPPORTED_AMOUNT"
+    ],
+    "texto": "No puedo confirmarte los $99.000. Un precio solo es válido si viene de una cotización del taller en esta conversación, y todavía no tengo ninguna. Lo que te dijo el asesor no lo puedo verificar. Por ahora, la cotización está pendiente.\n\nLo que sí revisé:\n- El cambio de aceite y filtro está **próximo**, pero todavía no toca. Según el motor, faltan 800 km o 155 días.\n- Esto sale del plan demo-2026.10-r1. Es una regla de demostración, con fuente SYNTHETIC-DEMO.\n\nTampoco puedo agendar todavía. Para eso necesito una cotización vigente y que elijas un horario. Aun así, la reserva solo existe cuando tú pulsas \"Confirmar reserva\" fuera del chat.\n\nTienes dos opciones:\n1. Seguimos con el proceso normal. Cuando el sistema me habilite la consulta de talleres, te cotizo con el primero de la lista y te muestro horarios. Puedes cambiar de taller si prefieres.\n2. Paso tu caso a un asesor para que valide el precio de $99.000 que te dieron.\n\n¿Cuál prefieres?"
+  }
+]

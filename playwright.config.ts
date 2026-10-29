@@ -11,6 +11,8 @@ const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "tests/e2e",
+  // Corre después de que el servidor está arriba: verifica que el LLM sea ScriptedLlm (sin costo).
+  globalSetup: "./tests/e2e/global-setup.ts",
   timeout: 60_000,
   expect: { timeout: 10_000 },
   // Secuencial: las corridas son aisladas, pero comparten el calendario simulado del taller (cupo 3 por horario);

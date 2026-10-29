@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import corpus from "./fixtures/guard-false-positives-8a.json";
 import { checkOutput, numbersIn, type GuardFacts } from "../output-guard";
 import { detectInjection } from "../safety/injection";
 import { classifySafety, normalizeText, safetyTemplate } from "../safety/lexicon";
@@ -139,5 +140,53 @@ describe("OG — validador de salida", () => {
   it("textos explicativos con datos respaldados pasan", () => {
     const text = "Según el plan demo-2026.10-r1, vence a los 75.000 km o el 2027-04-01 y faltan 800 km. Pulsa «Confirmar reserva» en la tarjeta.";
     expect(checkOutput(text, facts())).toEqual({ ok: true });
+  });
+});
+
+describe("OG — regresión con textos reales bloqueados por error (Claude, Fase 8A) — Fase 8B", () => {
+  // Hechos tipados equivalentes a los de las corridas: V1 (aceite, escenario A) y V2 (correa, historial UNKNOWN).
+  const factsA = facts({
+    amounts: new Set([280_000, 53_200, 333_200]),
+    kilometers: new Set([75_000, 800, 74_200, 70_000, 5_000]),
+    periods: new Set([7, 155, 12, 0]),
+    dates: new Set(["2027-04-01", "2026-10-30", "2026-04-01", "2026-10-28"]),
+  });
+  const factsB = facts({
+    amounts: new Set(),
+    kilometers: new Set([95_000, 100_000, 5_000]),
+    periods: new Set([7, 72, 8, 12]),
+    dates: new Set(["2026-10-20", "2026-02-15", "2026-10-28"]),
+    evaluationUnknown: true,
+  });
+
+  it.each(corpus.map((c) => [`${c.origen} ${c.caso} (${c.violacionesOriginales.join(",")})`, c] as const))("pasa: %s", (_name, c) => {
+    const base = c.caso.startsWith("B-") ? factsB : factsA;
+    const r = checkOutput(c.texto, { ...base, userNumbers: numbersIn(c.mensaje) });
+    expect(r, JSON.stringify(r)).toEqual({ ok: true });
+  });
+
+  it("las afirmaciones equivalentes sin respaldo siguen bloqueadas", () => {
+    const blocked: Array<[string, GuardFacts]> = [
+      ["Tu carro está al día con la correa.", factsB],
+      ["No te preocupes, estás al día.", factsB],
+      ["Te sale en $99.000.", { ...factsA, userNumbers: new Set([99_000]) }],
+      ["El cambio cuesta $99.000, como te dijo el asesor.", { ...factsA, userNumbers: new Set([99_000]) }],
+      ["Sobre el cambio: cuesta $120.000.", factsA],
+      ["Vence a los 76 mil km.", factsA],
+      ["Vence a los 76 000 km.", factsA],
+      ["Vence el 2 de abril de 2027.", factsA],
+      ["Te toca el 15 de noviembre.", factsA],
+      ["Cambia la correa cada 60 meses.", factsB],
+      ["El problema es la bomba de agua.", factsA],
+      ["Seguramente es el alternador.", factsA],
+      ["Te certifico que el carro está bien.", factsA],
+    ];
+    for (const [t, f] of blocked) expect(checkOutput(t, f).ok, t).toBe(false);
+  });
+
+  it("formatos equivalentes respaldados pasan", () => {
+    for (const t of ["Vence a los 75 000 km.", "Vence a los 75 mil km.", "Vence a los 75k km.", "Vence a los 75000 km.", "Vence el 1 de abril de 2027.", "La cotización vale hasta el viernes 30 de octubre.", "No puedo certificar el estado del carro.", "El problema es que no hay historial de la correa."]) {
+      expect(checkOutput(t, factsA), t).toEqual({ ok: true });
+    }
   });
 });

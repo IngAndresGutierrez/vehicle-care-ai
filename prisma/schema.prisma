@@ -667,23 +667,25 @@ model JourneyEvent {
 // ─────────────────────── Conversación y trazas del agente ───────────────────────
 
 model ConversationSession {
-  id            String                @id @default(cuid())
-  vehicleId     String
-  vehicle       Vehicle               @relation(fields: [vehicleId], references: [id])
-  actorId       String
-  memory        Json // memoria estructurada (AGENT_DESIGN §7)
+  id              String                @id @default(cuid())
+  vehicleId       String
+  vehicle         Vehicle               @relation(fields: [vehicleId], references: [id])
+  actorId         String
+  memory          Json // memoria estructurada (AGENT_DESIGN §7)
   /// Transcripción para el LLM, solo de añadido (preserved thinking, ADR-018). Sin PII ni tokens de confirmación.
-  transcript    Json                  @default("[]")
-  customerId    String? // titular por cuenta del cual actúa el agente
-  serviceCode   String                @default("ENGINE_OIL_FILTER")
-  turnCount     Int                   @default(0)
-  status        String                @default("ACTIVE") // ACTIVE | CLOSED
-  promptVersion String
-  model         String
-  startedAt     DateTime              @default(now())
-  lastActiveAt  DateTime              @updatedAt
-  messages      ConversationMessage[]
-  toolCalls     ToolCall[]
+  transcript      Json                  @default("[]")
+  customerId      String? // titular por cuenta del cual actúa el agente
+  serviceCode     String                @default("ENGINE_OIL_FILTER")
+  turnCount       Int                   @default(0)
+  status          String                @default("ACTIVE") // ACTIVE | CLOSED
+  promptVersion   String
+  model           String
+  startedAt       DateTime              @default(now())
+  lastActiveAt    DateTime              @updatedAt
+  /// Lease de turno (Fase 8B): un solo turno a la vez por sesión; vence solo si el proceso cae a mitad de un turno.
+  turnLockedUntil DateTime?
+  messages        ConversationMessage[]
+  toolCalls       ToolCall[]
 }
 
 model ConversationMessage {

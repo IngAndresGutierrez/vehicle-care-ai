@@ -26,6 +26,8 @@ export interface AdvisorLimits {
   turnTimeoutMs: number;
   maxMessageChars: number;
   maxTurnsPerSession: number;
+  /** Inactividad tras la cual una sesión se renueva (Fase 8B). */
+  sessionIdleMs: number;
 }
 
 export const DEFAULT_LIMITS: AdvisorLimits = {
@@ -35,6 +37,7 @@ export const DEFAULT_LIMITS: AdvisorLimits = {
   turnTimeoutMs: 45_000,
   maxMessageChars: 2_000,
   maxTurnsPerSession: 40,
+  sessionIdleMs: 2 * 60 * 60_000,
 };
 
 export interface AdvisorDeps extends GatewayDeps {
@@ -113,8 +116,34 @@ export class MaintenanceAdvisor {
     // historial que el proveedor rechazaría o descartaría. La respuesta lleva el nuevo sessionId.
     // Solo aplica a modelos reales: los simulados no producen bloques de pensamiento.
     if (session.promptVersion !== ADVISOR_PROMPT_VERSION || (!llm.info.simulated && session.model !== llm.info.model)) session = await newSession();
+    // Sesión inactiva: se renueva en vez de reanudar un contexto viejo (la memoria ya habría vencido; Fase 8B).
+    else if (now.getTime() - session.lastActiveAt.getTime() > this.limits.sessionIdleMs) session = await newSession();
     if (session.status !== "ACTIVE" || session.turnCount >= this.limits.maxTurnsPerSession) return err({ status: 409, code: "SESSION_CLOSED", message: "La sesión terminó; inicia una nueva." });
 
+    // ── Un solo turno a la vez por sesión (Fase 8B) ──
+    // Lease atómico ANTES de ejecutar herramientas: un segundo mensaje simultáneo se rechaza sin efectos, en vez de
+    // ejecutar herramientas en paralelo y fallar recién al guardar. El lease vence solo si el proceso cae a mitad del turno.
+    const leaseUntil = new Date(now.getTime() + this.limits.turnTimeoutMs + 15_000);
+    const lease = await db.conversationSession.updateMany({
+      where: { id: session.id, OR: [{ turnLockedUntil: null }, { turnLockedUntil: { lt: now } }] },
+      data: { turnLockedUntil: leaseUntil },
+    });
+    if (lease.count !== 1) return err({ status: 409, code: "TURN_IN_PROGRESS", message: "Hay otro mensaje en proceso en esta sesión; espera la respuesta e inténtalo de nuevo." });
+    try {
+      return await this.processTurn(input, session, now, serviceCode, message);
+    } finally {
+      await db.conversationSession.updateMany({ where: { id: session.id, turnLockedUntil: leaseUntil }, data: { turnLockedUntil: null } });
+    }
+  }
+
+  private async processTurn(
+    input: TurnInput,
+    session: { id: string; turnCount: number; memory: unknown; transcript: unknown },
+    now: Date,
+    serviceCode: string,
+    message: string,
+  ): Promise<Result<TurnResult, TurnError>> {
+    const { db, llm } = this.deps;
     const ctx: AgentSessionContext = {
       sessionId: session.id,
       traceId: input.traceId,
@@ -134,7 +163,7 @@ export class MaintenanceAdvisor {
     };
 
     // ── Consentimiento para tratar la conversación con IA (D-12): sin él no se procesa ni se guarda el mensaje ──
-    const consents = await db.consent.findMany({ where: { customerId: input.owner.customerId }, include: { events: true } });
+    const consents = await db.consent.findMany({ where: { customerId: input.owner.customerId ?? "" }, include: { events: true } });
     if (!decideProcessingConsent(consents).allowed) {
       result.assistant = { ...result.assistant, kind: "SYSTEM_NOTICE", text: "Para usar el asistente necesitamos tu autorización para tratar la conversación con inteligencia artificial. Puedes otorgarla en tus preferencias; mientras tanto, un asesor puede atenderte." };
       result.errors.push({ code: "CONSENT_REQUIRED", message: "Falta el consentimiento AI_ASSISTANT_PROCESSING.", retryable: false });
@@ -185,6 +214,13 @@ export class MaintenanceAdvisor {
         turnMessages.push({ role: "assistant", content: response.content });
 
         if (response.stopReason !== "tool_use") {
+          // Respuesta cortada (p. ej. max_tokens) con llamadas a herramientas a medio escribir: NO se ejecutan, pero
+          // cada tool_use recibe un tool_result de error para que la transcripción siga siendo válida (Fase 8B).
+          const truncated = response.content.filter((b) => b.type === "tool_use");
+          if (truncated.length) {
+            turnMessages.push({ role: "user", content: truncated.map((b) => ({ type: "tool_result" as const, toolUseId: b.type === "tool_use" ? b.id : "", content: JSON.stringify({ error: "NOT_EXECUTED", message: "La respuesta quedó incompleta; la herramienta no se ejecutó." }), isError: true })) });
+            result.trace.flags.push("TRUNCATED_TOOL_CALL");
+          }
           finalText = this.finalTextFor(response.stopReason, response.content, result);
           break;
         }
@@ -236,6 +272,8 @@ export class MaintenanceAdvisor {
       result.assistant.text = "Avancé con tu solicitud, pero el asistente no pudo terminar la respuesta. Revisa la información de abajo; puedes continuar desde ahí o escribir de nuevo.";
       result.trace.flags.push("LLM_FAILED_AFTER_TOOLS");
       result.cards = buildCards(outcomes);
+      // La tarjeta de evaluación sí llega al propietario: misma transición que en el camino normal (Fase 8B).
+      await this.markRecommendationShown(result.cards, ctx, serviceCode, input.traceId);
       turnMessages.push({ role: "assistant", content: [{ type: "text", text: result.assistant.text }] });
       return this.persist(result, ctx, session, this.applyOutcomes(memory, outcomes, now), [...transcript, ...turnMessages], false);
     }
@@ -244,13 +282,17 @@ export class MaintenanceAdvisor {
       result.errors.push({ code: "ITERATION_LIMIT", message: "Se alcanzó el límite de pasos del turno.", retryable: true });
     }
 
+    // Si el bucle terminó tras resultados de herramientas (límite de pasos o de tokens, respuesta truncada), se cierra
+    // con un mensaje del asistente: la transcripción nunca termina en un turno del usuario sin respuesta (Fase 8B).
+    if (turnMessages.at(-1)?.role === "user") turnMessages.push({ role: "assistant", content: [{ type: "text", text: finalText }] });
+
     // ── Validación de salida contra resultados estructurados ──
     const updated = this.applyOutcomes(memory, outcomes, now);
     const facts = await this.guardFacts(ctx, updated, outcomes, message);
     const guard = checkOutput(finalText, facts);
     if (!guard.ok) {
       result.trace.guard = { blocked: true, violations: guard.violations };
-      result.trace.flags.push("OUTPUT_BLOCKED");
+      result.trace.flags.push("OUTPUT_BLOCKED", ...guard.violations.map((v) => `GUARD:${v}`));
       updated.previousResponseBlocked = true;
       finalText = GUARD_FALLBACK_TEXT;
     } else {
@@ -259,14 +301,18 @@ export class MaintenanceAdvisor {
     result.assistant.text = finalText;
     result.cards = buildCards(outcomes);
 
-    // La recomendación se considera presentada cuando su tarjeta llega al propietario.
-    const evaluation = result.cards.find((c) => c.type === "EVALUATION");
-    const current = await findJourney(db, ctx);
-    if (evaluation && evaluation.type === "EVALUATION" && ACTIONABLE.has(evaluation.status) && current?.state === "CONVERSATION_OPEN" && current.context.lastEvaluation?.evaluationId === evaluation.evaluationId) {
-      await applyJourneyEvent(db, { vehicleId: ctx.vehicleId, serviceCode, event: { type: "RECOMMENDATION_SHOWN", evaluationId: evaluation.evaluationId }, actor: { actorId: ctx.agent.actorId, role: "SYSTEM_AGENT" }, traceId: input.traceId, idempotencyKey: `reco:${evaluation.evaluationId}` });
-    }
+    await this.markRecommendationShown(result.cards, ctx, serviceCode, input.traceId);
 
     return this.persist(result, ctx, session, updated, [...transcript, ...turnMessages], !guard.ok);
+  }
+
+  /** La recomendación se considera presentada cuando su tarjeta llega al propietario (evento RECOMMENDATION_SHOWN). */
+  private async markRecommendationShown(cards: readonly Card[], ctx: AgentSessionContext, serviceCode: string, traceId: string): Promise<void> {
+    const evaluation = cards.find((c) => c.type === "EVALUATION");
+    const current = await findJourney(this.deps.db, ctx);
+    if (evaluation && evaluation.type === "EVALUATION" && ACTIONABLE.has(evaluation.status) && current?.state === "CONVERSATION_OPEN" && current.context.lastEvaluation?.evaluationId === evaluation.evaluationId) {
+      await applyJourneyEvent(this.deps.db, { vehicleId: ctx.vehicleId, serviceCode, event: { type: "RECOMMENDATION_SHOWN", evaluationId: evaluation.evaluationId }, actor: { actorId: ctx.agent.actorId, role: "SYSTEM_AGENT" }, traceId, idempotencyKey: `reco:${evaluation.evaluationId}` });
+    }
   }
 
   private async safetyPath(
@@ -319,14 +365,29 @@ export class MaintenanceAdvisor {
     return content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("\n").trim() || "¿En qué más puedo ayudarte?";
   }
 
+  /**
+   * Contexto por turno, compacto (Fase 8B): se agrega a la transcripción en CADA turno, así que medía el 43 % de su
+   * tamaño. Solo lleva lo que el modelo necesita para decidir; el detalle (horarios, desgloses de precio, intervalos)
+   * ya está en los resultados de herramientas de la transcripción. La memoria completa sigue guardada para la guardia.
+   */
   private contextBlock(state: JourneyState, serviceCode: string, memory: AdvisorMemory): string {
+    const e = memory.lastEvaluation;
     return `${CONTEXT_HEADER}\n${JSON.stringify({
       journeyState: state,
       allowedTools: allowedTools(state),
       serviceCode,
-      memory,
+      memory: {
+        lastEvaluation: e ? { evaluationId: e.evaluationId, status: e.status, suggestedAction: e.suggestedAction, planVersion: e.planVersion } : null,
+        planVersion: memory.plan?.version ?? null,
+        knownKm: memory.knownKm,
+        workshops: memory.workshops,
+        activeQuote: memory.activeQuote ? { quoteId: memory.activeQuote.quoteId, workshopId: memory.activeQuote.workshopId, totalCop: memory.activeQuote.totalCop } : null,
+        // En el orden en que se mostraron: «el primero» = offeredSlots[0].
+        offeredSlots: memory.offeredSlots.map((sl) => ({ slotRef: sl.slotRef })),
+        pendingIntent: memory.pendingIntent ? { intentId: memory.pendingIntent.intentId } : null,
+        openCaseRefs: memory.openCaseRefs,
+      },
       previousResponseBlocked: memory.previousResponseBlocked,
-      note: "Taller, CRM y datos del vehículo son simulados (demostración).",
     })}`;
   }
 
@@ -433,6 +494,8 @@ export class MaintenanceAdvisor {
       }
     }
 
+    await this.addTypedFacts(ctx, { amounts, kilometers, periods, addDate });
+
     const journey = await findJourney(this.deps.db, ctx);
     const booking = journey?.context.activeBookingId ? await this.deps.db.booking.findUnique({ where: { id: journey.context.activeBookingId } }) : null;
     const confirmed = booking?.status === "CONFIRMED" && booking.externalBookingRef ? booking.externalBookingRef : null;
@@ -446,6 +509,60 @@ export class MaintenanceAdvisor {
       evaluationUnknown: memory.lastEvaluation?.status === "UNKNOWN",
       userNumbers: numbersIn(message),
     };
+  }
+
+  /**
+   * Hechos tipados del propio vehículo, leídos de la base (Fase 8B): lecturas de odómetro y su antigüedad, historial,
+   * reglas del plan VALIDADO, última evaluación, cotizaciones vigentes, intenciones y plazos de casos. Respaldan cifras
+   * verdaderas que el modelo menciona en turnos posteriores, sin depender de lo que quedó en memoria.
+   * Solo AÑADE hechos estructurados; no relaja ninguna regla.
+   */
+  private async addTypedFacts(
+    ctx: AgentSessionContext,
+    f: { amounts: Set<number>; kilometers: Set<number>; periods: Set<number>; addDate: (v: unknown) => unknown },
+  ): Promise<void> {
+    const { db, clock } = this.deps;
+    const now = clock.now();
+    const vehicleId = ctx.vehicleId;
+    const [readings, records, evaluation, quotes, intents, cases, vehicle] = await Promise.all([
+      db.odometerReading.findMany({ where: { vehicleId }, select: { valueKm: true, observedAt: true }, orderBy: { observedAt: "desc" }, take: 20 }),
+      db.serviceRecord.findMany({ where: { vehicleId }, select: { odometerKm: true, performedOn: true }, take: 50 }),
+      db.maintenanceEvaluation.findFirst({ where: { vehicleId, serviceCode: ctx.serviceCode }, orderBy: { evaluatedAt: "desc" }, select: { dueByKm: true, remainingKm: true, dueByDate: true, remainingDays: true } }),
+      db.quote.findMany({ where: { vehicleId, serviceCode: ctx.serviceCode, validUntil: { gt: now } }, select: { subtotalCop: true, taxCop: true, totalCop: true, validUntil: true }, take: 10 }),
+      db.bookingIntent.findMany({ where: { vehicleId, status: "AWAITING_USER", expiresAt: { gt: now } }, select: { expiresAt: true }, take: 5 }),
+      db.humanCase.findMany({ where: { vehicleId, status: { in: ["OPEN", "ASSIGNED"] } }, select: { slaDueAt: true }, take: 10 }),
+      db.vehicle.findUnique({ where: { id: vehicleId }, select: { specId: true } }),
+    ]);
+    for (const r of readings) {
+      f.kilometers.add(r.valueKm);
+      f.addDate(r.observedAt);
+      f.periods.add(Math.max(0, Math.floor((now.getTime() - r.observedAt.getTime()) / 86_400_000)));
+    }
+    for (const r of records) {
+      f.kilometers.add(r.odometerKm);
+      f.addDate(r.performedOn);
+    }
+    if (evaluation) {
+      [evaluation.dueByKm, evaluation.remainingKm].forEach((n) => n != null && f.kilometers.add(Math.abs(n)));
+      if (evaluation.dueByDate) f.addDate(evaluation.dueByDate.toISOString().slice(0, 10));
+      if (evaluation.remainingDays != null) f.periods.add(Math.abs(evaluation.remainingDays));
+    }
+    for (const q of quotes) {
+      [q.subtotalCop, q.taxCop, q.totalCop].forEach((n) => n != null && f.amounts.add(n));
+      f.addDate(q.validUntil);
+    }
+    intents.forEach((i) => f.addDate(i.expiresAt));
+    cases.forEach((c) => f.addDate(c.slaDueAt));
+    if (vehicle) {
+      const rules = await db.maintenanceRule.findMany({
+        where: { planVersion: { status: "VALIDATED", plan: { applicability: { some: { specId: vehicle.specId } } } } },
+        select: { intervalKm: true, intervalMonths: true },
+      });
+      for (const r of rules) {
+        if (r.intervalKm != null) f.kilometers.add(r.intervalKm);
+        if (r.intervalMonths != null) f.periods.add(r.intervalMonths);
+      }
+    }
   }
 
   private async fillJourney(result: TurnResult, ctx: AgentSessionContext): Promise<void> {
@@ -476,7 +593,8 @@ export class MaintenanceAdvisor {
         content: result.assistant.text,
         cards: redactCards(result.cards) as unknown as Prisma.InputJsonValue,
         traceId: ctx.traceId,
-        flagged: blocked && !result.trace.flags.includes("OUTPUT_BLOCKED") ? [...result.trace.flags, "OUTPUT_BLOCKED"] : result.trace.flags,
+        // Trazabilidad de fallos (Fase 8B): marcas de la traza, bloqueo de la guardia y códigos de error del turno.
+        flagged: [...new Set([...result.trace.flags, ...(blocked ? ["OUTPUT_BLOCKED"] : []), ...result.errors.map((e) => `ERROR:${e.code}`)])],
         createdAt: now,
       },
     });

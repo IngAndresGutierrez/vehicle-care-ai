@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { LlmBlock, LlmInfo, LlmMessage, LlmPort, LlmRequest, LlmResponse } from "./types";
 
 export interface AnthropicLlmConfig {
-  /** Modelo configurable por entorno (LLM_MODEL). Por defecto Claude Opus 5.5. */
+  /** Modelo configurable por entorno (LLM_MODEL). Por defecto Claude Sonnet 5.5 (ADR-021); Opus 5.5 para comparar. */
   model: string;
   /** low | medium | high | xhigh | max (LLM_EFFORT). */
   effort: "low" | "medium" | "high" | "xhigh" | "max";

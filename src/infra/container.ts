@@ -31,13 +31,21 @@ export interface Container {
 
 type Env = Record<string, string | undefined>;
 
+/** Modelo recomendado tras la evaluación real de la Fase 8A (ADR-021); Opus sigue disponible con LLM_MODEL. */
+export const DEFAULT_LLM_MODEL = "claude-sonnet-5-5";
+
 export function buildLlm(env: Env): LlmPort {
   const provider = (env.LLM_PROVIDER ?? "scripted").toLowerCase();
   if (provider === "scripted") return new ScriptedLlm();
   if (provider !== "anthropic") throw new Error(`LLM_PROVIDER desconocido: ${provider}`);
+  // Dentro de Vitest, el proveedor real exige autorización explícita (doble llave): una prueba general nunca debe gastar
+  // créditos aunque `.env` tenga LLM_PROVIDER=anthropic y una API key (incidente de la Fase 8A).
+  if (process.env.VITEST && process.env.RUN_LIVE_LLM_EVALS !== "1") {
+    throw new Error("Proveedor real bloqueado en pruebas: usa ScriptedLlm o define RUN_LIVE_LLM_EVALS=1 con un presupuesto aprobado");
+  }
   const effort = (env.LLM_EFFORT ?? "medium") as "low" | "medium" | "high" | "xhigh" | "max";
   return new AnthropicLlm({
-    model: env.LLM_MODEL ?? "claude-opus-5-5",
+    model: env.LLM_MODEL ?? DEFAULT_LLM_MODEL,
     effort,
     timeoutMs: Number(env.LLM_TIMEOUT_MS ?? 30_000),
     maxRetries: Number(env.LLM_MAX_RETRIES ?? 2),
